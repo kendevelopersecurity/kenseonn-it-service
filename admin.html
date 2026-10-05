@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin — Kenseonn IT Service</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin-body">
+  <div class="bg-grid"></div>
+  <main class="admin-wrap">
+    <section id="loginView" class="auth-card">
+      <div class="brand"><span class="brand-mark">K</span>KENSEONN ADMIN</div>
+      <h1>Admin Login</h1>
+      <p>Kelola profil, layanan, paket dan order dari Firebase.</p>
+      <form id="loginForm">
+        <input id="loginEmail" type="email" required placeholder="Email admin">
+        <input id="loginPassword" type="password" required placeholder="Password">
+        <button class="btn primary full">Masuk</button>
+        <div id="loginStatus" class="form-status"></div>
+      </form>
+      <a href="index.html">← Kembali ke website</a>
+    </section>
+
+    <section id="dashboard" class="dashboard hidden">
+      <header class="admin-header"><div><span class="kicker">CONTROL PANEL</span><h1>Kenseonn Admin</h1></div><button id="logoutBtn" class="btn ghost">Logout</button></header>
+      <div class="admin-tabs"><button class="admin-tab active" data-pane="overviewPane">Overview</button><button class="admin-tab" data-pane="sitePane">Website</button><button class="admin-tab" data-pane="servicesPane">Layanan</button><button class="admin-tab" data-pane="packagesPane">Paket</button><button class="admin-tab" data-pane="ordersPane">Orders</button></div>
+
+      <div id="overviewPane" class="admin-pane">
+        <div class="admin-stats"><div><b id="statOrders">0</b><span>Total orders</span></div><div><b id="statServices">0</b><span>Layanan</span></div><div><b id="statPackages">0</b><span>Paket</span></div></div>
+        <div class="admin-card"><h2>Quick guide</h2><p>Semua perubahan disimpan ke Firestore. Public website otomatis mengambil data terbaru saat dibuka.</p></div>
+      </div>
+
+      <div id="sitePane" class="admin-pane hidden">
+        <div class="admin-card"><h2>Website & Profil</h2><form id="siteForm" class="form-grid">
+          <label>Nama brand<input name="brandName"></label><label>Judul hero<input name="heroTitle"></label>
+          <label class="wide">Deskripsi hero<textarea name="heroText"></textarea></label><label>Nama profil<input name="aboutName"></label>
+          <label class="wide">Bio<textarea name="aboutBio"></textarea></label><label>Email<input name="email"></label>
+          <label>Instagram username<input name="instagram"></label><label>WhatsApp number<input name="whatsapp"></label>
+          <label>Experience text<input name="experience"></label>
+          <div class="wide maintenance-admin">
+            <h3>Maintenance Mode</h3>
+            <label class="toggle-line"><input type="checkbox" name="maintenanceEnabled" id="maintenanceEnabled"> Aktifkan Maintenance Mode</label>
+            <div class="form-grid">
+              <label>Judul maintenance<input name="maintenanceTitle" id="maintenanceTitleInput" placeholder="Website sedang maintenance"></label>
+              <label>Pesan maintenance<input name="maintenanceMessage" id="maintenanceMessageInput" placeholder="Silakan kembali beberapa saat lagi."></label>
+              <label>Countdown sampai<input type="datetime-local" name="maintenanceUntil" id="maintenanceUntilInput"></label>
+              <label>Status text<input name="maintenanceStatus" id="maintenanceStatusInput" placeholder="MAINTENANCE"></label>
+            </div>
+          </div>
+          <div class="wide"><button class="btn primary">Simpan Website</button><span id="siteStatus" class="form-status"></span></div>
+        </form></div>
+      </div>
+
+      <div id="servicesPane" class="admin-pane hidden">
+        <div class="admin-card"><h2>Tambah / Edit Layanan</h2><form id="serviceForm" class="form-grid">
+          <input type="hidden" name="id"><label>Nama layanan<input required name="name"></label><label>Icon<input name="icon" placeholder="⚡"></label>
+          <label class="wide">Deskripsi<textarea required name="description"></textarea></label><label>Status<select name="active"><option value="true">Aktif</option><option value="false">Nonaktif</option></select></label>
+          <div><button class="btn primary">Simpan</button><button type="button" id="serviceCancel" class="btn ghost">Reset</button></div>
+        </form></div><div id="servicesAdminList" class="admin-list"></div>
+      </div>
+
+      <div id="packagesPane" class="admin-pane hidden">
+        <div class="admin-card"><h2>Tambah / Edit Paket</h2><form id="packageForm" class="form-grid">
+          <input type="hidden" name="id"><label>Platform<select name="platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select></label>
+          <label>Qty<input required name="qty" placeholder="1K"></label><label>Harga (rupiah)<input required type="number" name="price"></label><label>Garansi<input required name="guarantee" placeholder="7 hari"></label>
+          <div><button class="btn primary">Simpan</button><button type="button" id="packageCancel" class="btn ghost">Reset</button></div>
+        </form></div><div id="packagesAdminList" class="admin-list"></div>
+      </div>
+
+      <div id="ordersPane" class="admin-pane hidden">
+        <div class="admin-card"><div class="list-head"><h2>Order Masuk</h2><button id="refreshOrders" class="btn ghost">Refresh</button></div><div id="ordersAdminList" class="orders-list"></div></div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
