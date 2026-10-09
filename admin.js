@@ -24,7 +24,7 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 onAuthStateChanged(auth, async user=>{
   if(!user){$("loginView").classList.remove("hidden");$("dashboard").classList.add("hidden");return}
   try{
-    const admin=await getDoc(doc(db,"admins",user.uid));
+    const admin=await Promise.race([getDoc(doc(db,"admins",user.uid)),new Promise((_,reject)=>setTimeout(()=>reject(new Error("Pemeriksaan admin timeout. Cek koneksi, Firebase config, dan Firestore Rules.")),10000))]);
     if(!admin.exists()||admin.data().enabled!==true){
       $("loginStatus").textContent="Akun ini belum diberi akses admin.";
       await signOut(auth);
@@ -34,11 +34,11 @@ onAuthStateChanged(auth, async user=>{
     await refreshAll();
   }catch(err){
     console.error(err);
-    $("loginStatus").textContent="Gagal memuat admin panel. Periksa Firebase dan Firestore Rules.";
+    $("loginStatus").textContent="Gagal memuat admin panel: "+(err?.code||err?.message||"periksa Firebase/Firestore Rules");
     $("dashboard").classList.add("hidden");$("loginView").classList.remove("hidden");
   }
 });
-$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginStatus").textContent="Memproses…";try{await signInWithEmailAndPassword(auth,$("loginEmail").value,$("loginPassword").value)}catch(err){$("loginStatus").textContent="Login gagal: "+err.message}});
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();const status=$("loginStatus");status.textContent="Memproses…";try{await Promise.race([signInWithEmailAndPassword(auth,$("loginEmail").value.trim(),$("loginPassword").value),new Promise((_,reject)=>setTimeout(()=>reject(new Error("Login timeout. Periksa koneksi internet dan Firebase Authentication.")),15000))]);}catch(err){status.textContent="Login gagal: "+(err?.code||err?.message||"Unknown error");}});
 $("logoutBtn").onclick=()=>signOut(auth);
 document.querySelectorAll(".admin-tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".admin-tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".admin-pane").forEach(x=>x.classList.add("hidden"));$(b.dataset.pane).classList.remove("hidden")});
 
