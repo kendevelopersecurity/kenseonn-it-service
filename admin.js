@@ -105,7 +105,7 @@ function getFormValue(form, name) {
 
 // Local-only design and social settings: no Firestore writes, no Rules changes.
 const DESIGN_KEY="kenseonn.design.v1", SOCIAL_KEY="kenseonn.social.v1";
-const designDefaults={accent:"#7cf29a",accent2:"#63a7ff",bg:"#06080d",panel:"#0c1119",effect:"cyber",animation:"on",intensity:"medium",particles:true};
+const designDefaults={accent:"#00f5a0",accent2:"#31c8ff",bg:"#05080d",panel:"#0a121b",effect:"matrix",animation:"on",intensity:"medium",particles:true,speed:"5",density:"60",logoText:"K",heroBadge:"DIGITAL SERVICE • ONLINE",grid:true,scanline:true,glow:true};
 const socialDefaults={instagram:"",tiktok:"",facebook:"",youtube:"",telegram:"",whatsapp:"",discord:"",github:"",x:"",linkedin:""};
 function localRead(key,fallback){try{return {...fallback,...JSON.parse(localStorage.getItem(key)||"{}")}}catch{return {...fallback}}}
 function fillLocalForm(form,data){if(!form)return;for(const [k,v] of Object.entries(data)){const field=form.elements.namedItem(k);if(field){if(field.type==="checkbox")field.checked=!!v;else field.value=v??""}}}
@@ -115,7 +115,7 @@ fillLocalForm($("socialForm"),localRead(SOCIAL_KEY,socialDefaults));
 $("designForm")?.addEventListener("submit",async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type="submit"]');setBusy(button,true);try{const design=collectLocalForm(event.currentTarget);await setDoc(doc(db,"siteConfig","main"),{design},{merge:true});showStatus("designStatus","Desain berhasil disimpan ke konfigurasi website ✓")}catch(error){showStatus("designStatus",showError("Gagal menyimpan desain",error))}finally{setBusy(button,false)}});
 $("socialForm")?.addEventListener("submit",async event=>{event.preventDefault();const data=collectLocalForm(event.currentTarget);for(const [key,value] of Object.entries(data)){if(!value)continue;try{const u=new URL(value);if(!["https:","http:"].includes(u.protocol))throw 0}catch{showStatus("socialStatus",`URL ${key} tidak valid. Gunakan https://`);return}}const button=event.currentTarget.querySelector('[type="submit"]');setBusy(button,true);try{await setDoc(doc(db,"siteConfig","main"),{social:data},{merge:true});showStatus("socialStatus","Link media sosial tersimpan dan dipublikasikan ✓")}catch(error){showStatus("socialStatus",showError("Gagal menyimpan media sosial",error))}finally{setBusy(button,false)}});
 $("resetDesign")?.addEventListener("click",async()=>{fillLocalForm($("designForm"),designDefaults);const button=$("resetDesign");setBusy(button,true);try{await setDoc(doc(db,"siteConfig","main"),{design:designDefaults},{merge:true});showStatus("designStatus","Desain default berhasil diterapkan ✓")}catch(error){showStatus("designStatus",showError("Gagal reset desain",error))}finally{setBusy(button,false)}});
-document.querySelectorAll(".theme-preset").forEach(button=>button.addEventListener("click",()=>{const presets={matrix:{accent:"#00ff88",accent2:"#00d9ff",bg:"#020806",panel:"#07130d",effect:"matrix"},ice:{accent:"#70e7ff",accent2:"#8daeff",bg:"#050b14",panel:"#0b1725",effect:"cyber"},purple:{accent:"#c084fc",accent2:"#818cf8",bg:"#090612",panel:"#151024",effect:"neon"},red:{accent:"#ff647c",accent2:"#ffb86b",bg:"#100609",panel:"#1b0c12",effect:"neon"}};const current=localRead(DESIGN_KEY,designDefaults);fillLocalForm($("designForm"),{...current,...presets[button.dataset.theme]});showStatus("designStatus","Preset dipilih. Klik Terapkan & Simpan Desain untuk menyimpan.")}));
+document.querySelectorAll(".theme-preset").forEach(button=>button.addEventListener("click",()=>{const presets={matrix:{accent:"#00ff88",accent2:"#00d9ff",bg:"#020806",panel:"#07130d",effect:"matrix"},ice:{accent:"#70e7ff",accent2:"#8daeff",bg:"#050b14",panel:"#0b1725",effect:"cyber"},purple:{accent:"#c084fc",accent2:"#818cf8",bg:"#090612",panel:"#151024",effect:"neon"},red:{accent:"#ff647c",accent2:"#ffb86b",bg:"#100609",panel:"#1b0c12",effect:"neon"},ocean:{accent:"#28d7ff",accent2:"#477bff",bg:"#04101a",panel:"#0a1d2b",effect:"stars"},snow:{accent:"#d9f4ff",accent2:"#85cfff",bg:"#07111b",panel:"#102234",effect:"snow"},emerald:{accent:"#00ff9d",accent2:"#00d9a6",bg:"#020c09",panel:"#071b13",effect:"matrix"}};const current=localRead(DESIGN_KEY,designDefaults);fillLocalForm($("designForm"),{...current,...presets[button.dataset.theme]});showStatus("designStatus","Preset dipilih. Klik Terapkan & Simpan Desain untuk menyimpan.")}));
 
 // LOGIN DAN PEMERIKSAAN ADMIN
 
@@ -261,6 +261,9 @@ async function refreshAll() {
       loadPackages(),
       loadOrders()
     ]);
+    const cfg = await getDoc(doc(db, "siteConfig", "main"));
+    const saved = cfg.exists() ? cfg.data() : {};
+    fillLocalForm($("designForm"), {...designDefaults, ...(saved.design || {})});
 
     showStatus("siteStatus", "Data berhasil dimuat ✓");
   } catch (error) {
@@ -633,4 +636,50 @@ $("refreshOrders")?.addEventListener("click", async () => {
   } finally {
     setBusy(button, false);
   }
+});
+
+// BOOSTING CENTER: navigate directly to package management.
+$("goPackages")?.addEventListener("click", () => {
+  document.querySelector('[data-pane="packagesPane"]')?.click();
+});
+
+// Design range readouts.
+["speed","density"].forEach(name => {
+  const field = $("designForm")?.elements.namedItem(name);
+  const output = $(name === "speed" ? "speedValue" : "densityValue");
+  const update = () => { if (output && field) output.value = field.value; };
+  field?.addEventListener("input", update); update();
+});
+
+// Browser-side website monitor. Reports only what this browser can observe.
+$("runMonitor")?.addEventListener("click", async () => {
+  const button = $("runMonitor");
+  setBusy(button, true);
+  showStatus("monitorMessage", "Memeriksa halaman publik...");
+  const started = performance.now();
+  try {
+    const response = await fetch("./?monitor=" + Date.now(), {cache:"no-store"});
+    const latency = Math.round(performance.now() - started);
+    showStatus("monitorStatus", response.ok ? "ONLINE" : "HTTP " + response.status);
+    showStatus("monitorLatency", latency + " ms");
+    showStatus("monitorOnline", navigator.onLine ? "Online" : "Offline");
+    showStatus("monitorScreen", `${screen.width} × ${screen.height}`);
+    showStatus("monitorMessage", response.ok ? "Halaman berhasil merespons dari browser ini." : "Website merespons dengan status HTTP " + response.status);
+  } catch (error) {
+    showStatus("monitorStatus", "CHECK FAILED");
+    showStatus("monitorLatency", "—");
+    showStatus("monitorOnline", navigator.onLine ? "Online" : "Offline");
+    showStatus("monitorMessage", "Tidak dapat menghubungi halaman publik: " + (error.message || error));
+  } finally { setBusy(button, false); }
+});
+
+// Export orders to a CSV file for local reporting.
+$("exportOrders")?.addEventListener("click", () => {
+  const cols = ["name","phone","email","service","details","status"];
+  const quote = value => '"' + String(value ?? "").replace(/"/g,'""') + '"';
+  const csv = [cols.join(","), ...orders.map(row => cols.map(key => quote(row[key])).join(","))].join("\\n");
+  const blob = new Blob(["\\ufeff" + csv], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a"); link.href=url; link.download="kenseonn-orders.csv"; link.click();
+  URL.revokeObjectURL(url);
 });

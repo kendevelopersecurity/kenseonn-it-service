@@ -92,19 +92,48 @@ function readLocal(key, fallback){try{return {...fallback,...JSON.parse(localSto
 function safeSocialUrl(value){
   try{const u=new URL(value);return ["https:","http:"].includes(u.protocol)?u.href:""}catch{return ""}
 }
+let fxFrame = 0;
 function applyLocalDesign(){
-  const d={...defaultDesign,...(site.design||readLocal(LOCAL_DESIGN_KEY,{}))}, root=document.documentElement;
+  const d={...defaultDesign,...(site.design||{})}, root=document.documentElement;
   root.style.setProperty("--accent",d.accent);root.style.setProperty("--accent2",d.accent2);
   root.style.setProperty("--bg",d.bg);root.style.setProperty("--panel",d.panel);
   document.body.classList.toggle("animations-off",d.animation==="off");
-  document.body.classList.remove("fx-neon","fx-matrix","fx-minimal","intensity-low","intensity-high");
+  document.body.classList.toggle("hide-grid",d.grid===false);
+  document.body.classList.toggle("hide-scanline",d.scanline===false);
+  document.body.classList.toggle("no-glow",d.glow===false);
+  const logo=document.querySelector(".brand-mark");
+  if(logo && d.logoText){logo.textContent=d.logoText;logo.classList.add("text-logo")}
+  const badge=byId("heroBadgeText");if(badge && d.heroBadge)badge.textContent=d.heroBadge;
+  document.body.classList.remove("fx-neon","fx-matrix","fx-minimal","fx-stars","fx-snow","fx-particles","intensity-low","intensity-high");
   if(d.effect==="neon")document.body.classList.add("fx-neon");
   if(d.effect==="matrix")document.body.classList.add("fx-matrix");
   if(d.effect==="minimal")document.body.classList.add("fx-minimal");
+  if(d.effect==="stars")document.body.classList.add("fx-stars");
+  if(d.effect==="snow")document.body.classList.add("fx-snow");
+  if(d.effect==="particles")document.body.classList.add("fx-particles");
   document.body.classList.add("intensity-"+(d.intensity||"medium"));
-  let layer=document.querySelector(".particle-layer");
-  if(d.particles && !layer){layer=document.createElement("div");layer.className="particle-layer";layer.setAttribute("aria-hidden","true");for(let i=0;i<26;i++){const dot=document.createElement("i");dot.style.left=(i*37%100)+"%";dot.style.animationDelay=(-i*.47)+"s";dot.style.animationDuration=(9+i%8)+"s";layer.append(dot)}document.body.prepend(layer)}
-  if(!d.particles)layer?.remove();
+  startFxCanvas(d);
+}
+function startFxCanvas(d){
+  const canvas=byId("fxCanvas");if(!canvas)return;
+  cancelAnimationFrame(fxFrame);
+  const ctx=canvas.getContext("2d");let w=0,h=0,items=[];
+  const resize=()=>{w=canvas.width=innerWidth*devicePixelRatio;h=canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+"px";canvas.style.height=innerHeight+"px";ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);w=innerWidth;h=innerHeight;};
+  resize();addEventListener("resize",resize,{passive:true});
+  const type=d.effect||"matrix",count=Math.max(10,Math.min(180,Number(d.density)||60)),speed=Math.max(1,Math.min(10,Number(d.speed)||5));
+  const symbols="アイウエオカキクケコサシスセソタチツテト0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  items=Array.from({length:count},()=>({x:Math.random()*w,y:Math.random()*h,v:.3+Math.random()*speed*.45,r:Math.random()*2+0.5,char:symbols[Math.floor(Math.random()*symbols.length)],alpha:.15+Math.random()*.7}));
+  const draw=()=>{
+    if(d.animation==="off"||type==="minimal"||type==="cyber"){ctx.clearRect(0,0,w,h);return;}
+    ctx.clearRect(0,0,w,h);
+    for(const p of items){
+      ctx.globalAlpha=p.alpha;
+      if(type==="matrix"){ctx.fillStyle=d.accent||"#00ff88";ctx.font="14px monospace";ctx.fillText(p.char,p.x,p.y);p.y+=p.v*speed*.7;if(p.y>h+20){p.y=-20;p.x=Math.random()*w}}
+      else {ctx.fillStyle=type==="snow"?"#e8f7ff":(d.accent2||"#9bdcff");ctx.beginPath();ctx.arc(p.x,p.y,p.r*(type==="stars"?1.2:1),0,Math.PI*2);ctx.fill();p.y+=p.v*(type==="snow"?speed*.45:speed*.18);p.x+=Math.sin(p.y*.01)*.35;if(p.y>h+8){p.y=-8;p.x=Math.random()*w}}
+    }
+    ctx.globalAlpha=1;fxFrame=requestAnimationFrame(draw);
+  };
+  if(!matchMedia("(prefers-reduced-motion: reduce)").matches)draw();
 }
 function renderSocialLinks(){
   const holder=byId("socialLinks");if(!holder)return;
@@ -215,7 +244,7 @@ function render() {
     }
   }
 
-  renderPackages("instagram");
+  renderPlatformTabs();
 }
 
 function renderPackages(platform) {

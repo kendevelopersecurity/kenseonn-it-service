@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin — Kenseonn IT Service</title>
-  <link rel="stylesheet" href="styles.css?v=ultimate2">
+  <link rel="stylesheet" href="styles.css?v=neonultimate2">
 </head>
 <body class="admin-body">
   <div class="bg-grid"></div>
@@ -23,7 +23,7 @@
 
     <section id="dashboard" class="dashboard hidden">
       <header class="admin-header"><div><span class="kicker">CONTROL PANEL</span><h1>Kenseonn Admin</h1></div><button id="logoutBtn" class="btn ghost">Logout</button></header>
-      <div class="admin-tabs"><button class="admin-tab active" data-pane="overviewPane">Overview</button><button class="admin-tab" data-pane="sitePane">Website</button><button class="admin-tab" data-pane="servicesPane">Layanan</button><button class="admin-tab" data-pane="packagesPane">Paket</button><button class="admin-tab" data-pane="ordersPane">Orders</button><button class="admin-tab" data-pane="designPane">Design Studio</button><button class="admin-tab" data-pane="socialPane">Social Media</button></div>
+      <div class="admin-tabs"><button class="admin-tab active" data-pane="overviewPane">Overview</button><button class="admin-tab" data-pane="sitePane">Website</button><button class="admin-tab" data-pane="servicesPane">Layanan</button><button class="admin-tab" data-pane="packagesPane">Paket</button><button class="admin-tab" data-pane="ordersPane">Orders</button><button class="admin-tab" data-pane="designPane">Design Studio</button><button class="admin-tab" data-pane="socialPane">Boosting Center</button><button class="admin-tab" data-pane="monitorPane">Monitor & Tools</button></div>
 
       <div id="overviewPane" class="admin-pane">
         <div class="admin-stats"><div><b id="statOrders">0</b><span>Total orders</span></div><div><b id="statServices">0</b><span>Layanan</span></div><div><b id="statPackages">0</b><span>Paket</span></div></div>
@@ -61,14 +61,14 @@
 
       <div id="packagesPane" class="admin-pane hidden">
         <div class="admin-card"><h2>Tambah / Edit Paket</h2><form id="packageForm" class="form-grid">
-          <input type="hidden" name="id"><label>Platform<select name="platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select></label>
+          <input type="hidden" name="id"><label>Platform<select name="platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="facebook">Facebook</option><option value="youtube">YouTube</option><option value="telegram">Telegram</option><option value="x">X / Twitter</option><option value="threads">Threads</option><option value="marketplace">Marketplace</option></select></label>
           <label>Qty<input required name="qty" placeholder="1K"></label><label>Harga (rupiah)<input required type="number" name="price"></label><label>Garansi<input required name="guarantee" placeholder="7 hari"></label>
           <div><button class="btn primary">Simpan</button><button type="button" id="packageCancel" class="btn ghost">Reset</button></div>
         </form></div><div id="packagesAdminList" class="admin-list"></div>
       </div>
 
       <div id="ordersPane" class="admin-pane hidden">
-        <div class="admin-card"><div class="list-head"><h2>Order Masuk</h2><button id="refreshOrders" class="btn ghost">Refresh</button></div><div id="ordersAdminList" class="orders-list"></div></div>
+        <div class="admin-card"><div class="list-head"><h2>Order Masuk</h2><button id="refreshOrders" class="btn ghost">Refresh</button><button id="exportOrders" class="btn ghost" type="button">Export CSV</button></div><div id="ordersAdminList" class="orders-list"></div></div>
       </div>
 
       <div id="designPane" class="admin-pane hidden">
@@ -86,37 +86,68 @@
             <label>Warna kedua<input type="color" name="accent2" value="#63a7ff"></label>
             <label>Warna latar<input type="color" name="bg" value="#06080d"></label>
             <label>Warna panel<input type="color" name="panel" value="#0c1119"></label>
-            <label>Efek visual<select name="effect"><option value="cyber">Cyber</option><option value="neon">Neon Glow</option><option value="matrix">Matrix</option><option value="minimal">Minimal</option></select></label>
+            <label>Efek visual<select name="effect"><option value="cyber">Cyber Grid</option><option value="neon">Neon Glow</option><option value="matrix">Matrix Rain</option><option value="stars">Starfield</option><option value="snow">Snowfall</option><option value="particles">Floating Particles</option><option value="minimal">Minimal</option></select></label>
             <label>Intensitas efek<select name="intensity"><option value="low">Rendah</option><option value="medium">Sedang</option><option value="high">Tinggi</option></select></label>
+            <label>Kecepatan animasi <output id="speedValue">5</output><input type="range" name="speed" min="1" max="10" value="5"></label>
+            <label>Jumlah partikel <output id="densityValue">60</output><input type="range" name="density" min="10" max="180" value="60"></label>
+            <label>Gaya logo<input name="logoText" maxlength="4" value="K"></label>
+            <label>Label badge hero<input name="heroBadge" placeholder="DIGITAL SERVICE • ONLINE"></label>
+            <label class="toggle-line"><input type="checkbox" name="grid" checked> Grid latar</label>
+            <label class="toggle-line"><input type="checkbox" name="scanline" checked> Scanline terminal</label>
+            <label class="toggle-line"><input type="checkbox" name="glow" checked> Neon glow</label>
             <label>Animasi<select name="animation"><option value="on">Aktif</option><option value="off">Nonaktif</option></select></label>
             <label class="toggle-line"><input type="checkbox" name="particles"> Aktifkan partikel animasi</label>
-            <div class="wide"><button type="submit" class="btn primary">Terapkan & Simpan Desain</button> <button type="button" id="resetDesign" class="btn ghost">Reset Default</button><div id="designStatus" class="form-status"></div></div>
+            <div class="wide"><button type="submit" class="btn primary">Terapkan & Simpan Desain</button> <button type="button" id="resetDesign" class="btn ghost">Reset Default</button><div class="preview-chip">Preview efek tampil di website setelah disimpan dan halaman dimuat ulang.</div><div id="designStatus" class="form-status"></div></div>
           </form>
         </div>
       </div>
 
       <div id="socialPane" class="admin-pane hidden">
         <div class="admin-card">
-          <h2>Social Media</h2>
-          <p>Masukkan tautan lengkap akun media sosial. Kolom yang dikosongkan tidak akan ditampilkan di website.</p>
-          <form id="socialForm" class="form-grid">
-            <label>Instagram URL<input type="url" name="instagram" placeholder="https://instagram.com/username"></label>
-            <label>TikTok URL<input type="url" name="tiktok" placeholder="https://tiktok.com/@username"></label>
-            <label>Facebook URL<input type="url" name="facebook" placeholder="https://facebook.com/username"></label>
-            <label>YouTube URL<input type="url" name="youtube" placeholder="https://youtube.com/@channel"></label>
-            <label>WhatsApp URL<input type="url" name="whatsapp" placeholder="https://wa.me/628xxxxxxxxxx"></label>
-            <label>Telegram URL<input type="url" name="telegram" placeholder="https://t.me/username"></label>
-            <label>Discord URL<input type="url" name="discord" placeholder="https://discord.gg/invite"></label>
-            <label>GitHub URL<input type="url" name="github" placeholder="https://github.com/username"></label>
-            <label>X / Twitter URL<input type="url" name="x" placeholder="https://x.com/username"></label>
-            <label>LinkedIn URL<input type="url" name="linkedin" placeholder="https://linkedin.com/in/username"></label>
-            <div class="wide"><button type="submit" class="btn primary">Simpan Social Media</button><div id="socialStatus" class="form-status"></div></div>
-          </form>
+          <span class="kicker">BOOSTING OPERATIONS</span>
+          <h2>Social Media Boosting Center</h2>
+          <p>Kelola katalog layanan followers, likes, views, subscribers, comments, dan engagement dari menu Paket. Tidak ada kolom tautan akun pribadi di sini.</p>
+          <div class="boost-platform-grid">
+            <div class="boost-platform">◎ <b>Instagram</b><small>Followers • Likes • Views • Reels</small></div>
+            <div class="boost-platform">♪ <b>TikTok</b><small>Followers • Likes • Views • Shares</small></div>
+            <div class="boost-platform">f <b>Facebook</b><small>Page likes • Followers • Views</small></div>
+            <div class="boost-platform">▶ <b>YouTube</b><small>Subscribers • Views • Likes</small></div>
+            <div class="boost-platform">➤ <b>Telegram</b><small>Members • Views • Reactions</small></div>
+            <div class="boost-platform">𝕏 <b>X / Twitter</b><small>Followers • Likes • Views</small></div>
+            <div class="boost-platform">◉ <b>Threads</b><small>Followers • Likes • Views</small></div>
+            <div class="boost-platform">◈ <b>Marketplace</b><small>Store visits • Product engagement</small></div>
+          </div>
+          <div class="admin-card inset-card">
+            <h3>Kelola produk boosting</h3>
+            <p>Tambah/edit paket, harga, jumlah, platform dan garansi pada menu Paket. Semua paket aktif akan muncul pada katalog website.</p>
+            <button type="button" class="btn primary" id="goPackages">Buka Pengelolaan Paket</button>
+          </div>
+          <div class="form-status" id="boostStatus">Gunakan layanan sesuai kebijakan platform. Jangan menjanjikan hasil atau angka yang tidak dapat dipastikan.</div>
+        </div>
+      </div>
+      <div id="monitorPane" class="admin-pane hidden">
+        <div class="admin-card">
+          <span class="kicker">LIVE DIAGNOSTICS</span><h2>Website Monitor</h2>
+          <p>Monitor ini menguji respons halaman publik dari browser kamu. Ini bukan pemantauan server 24/7.</p>
+          <div class="monitor-grid">
+            <div><small>Website response</small><b id="monitorStatus">Belum diuji</b></div>
+            <div><small>Latency</small><b id="monitorLatency">—</b></div>
+            <div><small>Browser online</small><b id="monitorOnline">—</b></div>
+            <div><small>Screen</small><b id="monitorScreen">—</b></div>
+          </div>
+          <button class="btn primary" type="button" id="runMonitor">Jalankan pemeriksaan</button>
+          <span class="form-status" id="monitorMessage"></span>
+        </div>
+        <div class="admin-card">
+          <h2>30 Admin Tools</h2>
+          <div class="tool-grid">
+            <div>01 Brand name</div><div>02 Logo monogram</div><div>03 Hero headline</div><div>04 Hero description</div><div>05 Hero badge text</div><div>06 Profile name</div><div>07 Profile biography</div><div>08 Contact email</div><div>09 Instagram handle</div><div>10 WhatsApp contact</div><div>11 Experience text</div><div>12 Maintenance switch</div><div>13 Maintenance title</div><div>14 Maintenance message</div><div>15 Maintenance countdown</div><div>16 Maintenance status</div><div>17 Add service</div><div>18 Edit service</div><div>19 Delete service</div><div>20 Service visibility</div><div>21 Add boosting package</div><div>22 Edit boosting package</div><div>23 Delete boosting package</div><div>24 Multi-platform packages</div><div>25 Package price/quantity/guarantee</div><div>26 View and refresh orders</div><div>27 Update order status</div><div>28 Export orders CSV</div><div>29 Design presets and custom effects</div><div>30 Live browser website monitor</div>
+          </div>
         </div>
       </div>
     </section>
   </main>
-  <script type="module" src="admin.js?v=ultimate2"></script>
+  <script type="module" src="admin.js?v=neonultimate2"></script>
   <script>
     // Fallback navigation: keeps admin tabs usable even if Firebase module loading is delayed.
     document.querySelectorAll('.admin-tab').forEach(function (button) {
