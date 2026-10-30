@@ -22,3 +22,7 @@
 
 /* Customer order timeline and archive/audit utilities */
 .order-timeline{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.order-timeline span{font-size:.68rem;padding:5px 8px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:999px;color:var(--muted,#9ba8b8);text-transform:capitalize}.order-timeline span.reached{border-color:var(--accent,#79f2a0);color:var(--accent,#79f2a0);background:rgba(121,242,160,.08)}.order-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.audit-entry{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.09)}.audit-entry small{display:block;color:var(--muted,#9ba8b8);margin-top:3px}.audit-entry p{margin:5px 0 0;color:var(--muted,#9ba8b8)}
+
+/* Diagnostics output */
+.diagnostics-list{display:grid;gap:8px;margin-top:12px}.diagnostic-row{padding:10px 12px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:10px;background:rgba(255,255,255,.025)}.diagnostic-row b,.diagnostic-row small{display:block}.diagnostic-row small{margin-top:4px;opacity:.75;overflow-wrap:anywhere}
+

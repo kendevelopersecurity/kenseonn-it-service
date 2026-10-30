@@ -15,7 +15,7 @@
       <form id="loginForm">
         <input id="loginEmail" type="email" required placeholder="Email admin">
         <input id="loginPassword" type="password" required placeholder="Password">
-        <button class="btn primary full">Masuk</button>
+        <button type="submit" class="btn primary full">Masuk</button>
         <div id="loginStatus" class="form-status"></div>
       </form>
       <a href="index.html">← Kembali ke website</a>
@@ -104,6 +104,7 @@
       <div id="systemPane" class="admin-pane hidden">
         <div class="admin-card"><span class="kicker">MAINTENANCE & DIAGNOSTICS</span><h2>System Tools</h2><div class="system-grid">
           <div class="tool-card"><h3>Website monitor</h3><p>Uji waktu respons halaman publik dari perangkat ini.</p><button id="runMonitor" class="btn primary">Jalankan pemeriksaan</button><b id="monitorResult">Belum diperiksa</b></div>
+          <div class="tool-card"><h3>Diagnostik fitur & bug</h3><p>Periksa elemen penting, file JavaScript, sesi admin, dan akses Firestore. Hasilnya pemeriksaan dari browser, bukan audit keamanan server.</p><button id="runDiagnostics" class="btn primary">Scan bug & fitur</button><b id="diagnosticsResult">Belum diperiksa</b><div id="diagnosticsList" class="diagnostics-list"></div></div>
           <div class="tool-card"><h3>Firebase connection</h3><p>Uji pembacaan dokumen konfigurasi publik.</p><button id="runFirebaseCheck" class="btn ghost">Test Firestore</button><b id="firebaseResult">Belum diperiksa</b></div>
           <div class="tool-card"><h3>Backup konfigurasi</h3><p>Unduh salinan konfigurasi, layanan, dan paket sebagai JSON.</p><button id="backupData" class="btn ghost">Download backup</button></div>
           <div class="tool-card"><h3>Restore konfigurasi</h3><p>Restore backup JSON ke siteConfig/main. Lakukan dengan hati-hati.</p><input id="restoreFile" type="file" accept="application/json"><button id="restoreData" class="btn danger">Restore JSON</button></div>

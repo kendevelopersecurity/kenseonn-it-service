@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   where
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, sendEmailVerification, reload } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
@@ -359,6 +359,12 @@ onAuthStateChanged(auth, async user => {
   if (authGuest) authGuest.classList.toggle("hidden", !!user);
   if (customerDashboard) customerDashboard.classList.toggle("hidden", !user);
   if (!user) return;
+  if (!user.emailVerified) {
+    setText("customerLoginStatus", "Email belum diverifikasi. Buka Gmail, klik tautan verifikasi dari Firebase, lalu login kembali.");
+    if (customerDashboard) customerDashboard.classList.add("hidden");
+    if (authGuest) authGuest.classList.remove("hidden");
+    return;
+  }
   setText("customerName", user.displayName || "Pelanggan Kenseonn");
   setText("customerEmail", user.email || "");
   const emailField = document.querySelector('#orderForm [name="email"]');
@@ -377,8 +383,10 @@ byId("registerForm")?.addEventListener("submit", async event => {
     button.disabled = true; setText("registerStatus", "Membuat akun...");
     const credential = await createUserWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password")));
     await updateProfile(credential.user, { displayName: String(data.get("name")).trim() });
-    await setDoc(doc(db, "customers", credential.user.uid), { name: String(data.get("name")).trim(), email: credential.user.email, createdAt: serverTimestamp() }, { merge: true });
-    form.reset(); setText("registerStatus", "Akun berhasil dibuat. Dashboard siap digunakan.");
+    await setDoc(doc(db, "customers", credential.user.uid), { name: String(data.get("name")).trim(), email: credential.user.email, emailVerified: false, createdAt: serverTimestamp() }, { merge: true });
+    await sendEmailVerification(credential.user);
+    await signOut(auth);
+    form.reset(); setText("registerStatus", "Akun dibuat. Kami mengirim email verifikasi ke Gmail Anda. Buka email dari Firebase lalu klik tautan verifikasi. Setelah itu silakan login.");
   } catch(err) { setText("registerStatus", err.code === "auth/email-already-in-use" ? "Email sudah terdaftar. Silakan login." : `Pendaftaran gagal: ${err.code || err.message}`); }
   finally { button.disabled = false; }
 });
@@ -389,7 +397,7 @@ byId("customerLoginForm")?.addEventListener("submit", async event => {
   const until = Number(sessionStorage.getItem(loginCooldownKey) || 0), remaining = until - Date.now();
   if (remaining > 0) { setText("customerLoginStatus", `Terlalu banyak percobaan. Coba lagi dalam ${Math.ceil(remaining/60000)} menit.`); return; }
   if (button.disabled) return;
-  try { button.disabled = true; setText("customerLoginStatus", "Memproses login..."); await signInWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password"))); sessionStorage.removeItem(loginCooldownKey); form.reset(); setText("customerLoginStatus", "Login berhasil."); }
+  try { button.disabled = true; setText("customerLoginStatus", "Memproses login..."); const credential = await signInWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password"))); await reload(credential.user); if (!credential.user.emailVerified) { await signOut(auth); setText("customerLoginStatus", "Email belum diverifikasi. Periksa Gmail dan klik tautan verifikasi sebelum masuk."); return; } await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, emailVerified: true, updatedAt: serverTimestamp() }, { merge: true }); sessionStorage.removeItem(loginCooldownKey); form.reset(); setText("customerLoginStatus", "Login berhasil."); }
   catch(err) {
     if (err.code === "auth/too-many-requests") sessionStorage.setItem(loginCooldownKey, String(Date.now()+15*60*1000));
     const messages = {"auth/too-many-requests":"Firebase membatasi percobaan sementara. Tunggu 15 menit sebelum mencoba lagi.","auth/invalid-credential":"Email atau password tidak sesuai.","auth/user-not-found":"Akun tidak ditemukan.","auth/wrong-password":"Password tidak benar.","auth/network-request-failed":"Koneksi internet bermasalah."};
@@ -405,7 +413,7 @@ const orderForm = byId("orderForm");
 if (orderForm) orderForm.addEventListener("submit", async event => {
   event.preventDefault();
   const form = event.currentTarget, submitButton = form.querySelector('[type="submit"]');
-  if (!currentCustomer) { showOrderStatus("Silakan daftar atau masuk melalui Customer Dashboard sebelum membuat pesanan."); byId("account")?.scrollIntoView({behavior:"smooth"}); return; }
+  if (!currentCustomer || !currentCustomer.emailVerified) { showOrderStatus("Silakan daftar atau masuk melalui Customer Dashboard sebelum membuat pesanan."); byId("account")?.scrollIntoView({behavior:"smooth"}); return; }
   if (!form.reportValidity()) return;
   const fields = new FormData(form);
   const name = String(fields.get("name") || currentCustomer.displayName || "Pelanggan").trim();

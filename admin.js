@@ -1,3 +1,14 @@
+// Tampilkan kegagalan JavaScript yang sebelumnya membuat tombol tampak tidak merespons.
+window.addEventListener("error", event => {
+  const status = document.getElementById("loginStatus");
+  if (status && !document.getElementById("dashboard")?.classList.contains("hidden")) return;
+  if (status) status.textContent = `Kesalahan JavaScript: ${event.message || "modul gagal dimuat"}. Periksa koneksi dan konfigurasi Firebase.`;
+});
+window.addEventListener("unhandledrejection", event => {
+  const status = document.getElementById("loginStatus");
+  if (status) status.textContent = `Proses gagal: ${event.reason?.code || event.reason?.message || "kesalahan tidak diketahui"}`;
+});
+
 
 import {
   initializeApp,
@@ -329,7 +340,7 @@ function renderCustomers() {
   const target = $("customersAdminList"); if (!target) return;
   const q = String($("customerSearch")?.value || "").toLowerCase();
   const list = customers.filter(c => [c.name,c.email,c.phone,c.id].some(v => String(v||"").toLowerCase().includes(q)));
-  target.innerHTML = list.map(c => `<article class="admin-row"><div><b>${esc(c.name || "Pelanggan")}</b><small>${esc(c.email || "")} · UID ${esc(c.id)}</small></div><span class="status-chip">Customer</span></article>`).join("") || '<p class="muted-note">Belum ada pelanggan yang cocok.</p>';
+  target.innerHTML = list.map(c => `<article class="admin-row"><div><b>${esc(c.name || "Pelanggan")}</b><small>${esc(c.email || "")} · UID ${esc(c.id)}<br>WhatsApp: ${esc(c.phone || "Belum diisi")} · Daftar: ${esc(dateValue(c.createdAt) || "Tidak tersedia")}</small></div><span class="status-chip">${c.emailVerified === true ? "Email terverifikasi" : "Menunggu verifikasi"}</span></article>`).join("") || '<p class="muted-note">Belum ada pelanggan yang cocok.</p>';
 }
 $("customerSearch")?.addEventListener("input", renderCustomers);
 $("showArchivedOrders")?.addEventListener("change", renderOrders);
@@ -360,7 +371,7 @@ $("siteForm")?.addEventListener("submit", async event => {
     await setDoc(doc(db, "siteConfig", "main"), data, { merge: true });
 
     showStatus("siteStatus", "Pengaturan berhasil disimpan ✓");
-    await auditAdmin("Ubah pengaturan website", `Pendaftaran: ${data.registrationEnabled ? "ON" : "OFF"}; maintenance: ${data.maintenanceEnabled ? "ON" : "OFF"}`);
+    logActivity(`Ubah pengaturan website · Pendaftaran ${data.registrationEnabled ? "ON" : "OFF"} · Maintenance ${data.maintenanceEnabled ? "ON" : "OFF"}`);
   } catch (error) {
     showStatus("siteStatus", showError("Gagal menyimpan website", error));
   } finally {
@@ -732,3 +743,21 @@ const _loadServicesUltimate=loadServices;
 loadServices=async function(){await _loadServicesUltimate();};
 const _loadPackagesUltimate=loadPackages;
 loadPackages=async function(){await _loadPackagesUltimate();};
+
+
+// DIAGNOSTIK FRONT-END: pemeriksaan runtime ringan, bukan pemindai keamanan server.
+$("runDiagnostics")?.addEventListener("click", async () => {
+  const out = $("diagnosticsResult"), list = $("diagnosticsList");
+  out.textContent = "Memindai..."; list.innerHTML = "";
+  const checks = [];
+  const check = (name, ok, detail) => checks.push({name, ok, detail});
+  ["loginForm","loginEmail","loginPassword","dashboard","customersAdminList","ordersAdminList","siteForm","serviceForm","packageForm"].forEach(id => check(`Elemen #${id}`, !!$(id), $(id) ? "Ditemukan" : "Tidak ditemukan"));
+  check("Firebase Auth aktif", !!auth.currentUser, auth.currentUser ? "Sesi pengguna tersedia" : "Belum ada sesi pengguna");
+  check("Admin login handler", !!$("loginForm") && !!$("loginForm").querySelector('[type="submit"]'), "Form dan tombol submit tersedia");
+  try { await getDoc(doc(db,"siteConfig","main")); check("Firestore read", true, "Dokumen siteConfig/main dapat dibaca"); } catch(e) { check("Firestore read", false, `${e.code || e.message}`); }
+  try { await getDocs(query(collection(db,"customers"))); check("Database member", true, `${customers.length} member dimuat pada panel`); } catch(e) { check("Database member", false, `${e.code || e.message}`); }
+  const failed = checks.filter(x => !x.ok).length;
+  out.textContent = `${checks.length - failed}/${checks.length} pemeriksaan lolos · ${failed} masalah`;
+  list.innerHTML = checks.map(x => `<div class="diagnostic-row"><b>${x.ok ? "✓" : "✕"} ${esc(x.name)}</b><small>${esc(x.detail)}</small></div>`).join("");
+  logActivity(`Diagnostik dijalankan: ${failed} masalah dari ${checks.length} pemeriksaan`);
+});
