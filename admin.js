@@ -813,5 +813,4 @@ $("designForm")?.elements.namedItem("theme")?.addEventListener("change",e=>{
  const f=$("designForm"); Object.entries(preset).forEach(([k,v])=>{const el=f.elements.namedItem(k);if(el){if(el.type==="checkbox")el.checked=v;else el.value=v;}});
  $("previewEffect")?.click();
 });
-const _refreshAllUltimate=refreshAll;
-refreshAll=async function(){await _refreshAllUltimate();try{await loadFeatureManager();}catch(e){console.warn("Feature Manager load:",e);}};
+refreshAll=async function(){await _refreshAllUltimate();try{await loadFeatureManager();}catch(e){console.warn("Feature Manager load:",e);}}
