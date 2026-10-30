@@ -69,7 +69,7 @@ const fallbackSite = {
   experience: "4+ years learning & building"
 };
 
-let services = fallbackServices;
+let services = [];
 let packages = fallbackPackages;
 let site = { ...fallbackSite };
 
@@ -102,11 +102,9 @@ async function loadData() {
       getDoc(doc(db, "siteConfig", "main"))
     ]);
 
-    if (!serviceSnap.empty) {
-      services = serviceSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(s => s.active !== false);
-    }
+    services = serviceSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => s.active !== false);
 
     if (!packageSnap.empty) {
       packages = packageSnap.docs.map(d => ({
@@ -119,10 +117,14 @@ async function loadData() {
       site = { ...fallbackSite, ...siteSnap.data() };
     }
     registrationEnabled = site.registrationEnabled !== false;
+    const orderFormEl = byId("orderForm");
+    if (orderFormEl) orderFormEl.classList.toggle("hidden", site.orderingEnabled === false);
+    const catalogEl = byId("servicesGrid");
+    if (catalogEl) catalogEl.classList.toggle("hidden", site.publicCatalogEnabled === false);
   } catch (err) {
     console.error("Gagal memuat data website:", err);
     showOrderStatus(
-      "Info: data online belum berhasil dimuat. Katalog bawaan ditampilkan."
+      "Katalog online belum dapat dimuat. Silakan muat ulang atau hubungi admin."
     );
   }
 

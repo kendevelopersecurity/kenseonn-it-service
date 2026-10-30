@@ -207,19 +207,8 @@ document.querySelectorAll(".admin-tab").forEach(button => {
 // DATA AWAL DAN PEMUATAN DATA
 
 async function ensureDefaults() {
-  const servicesSnap = await getDocs(collection(db, "services"));
-
-  if (servicesSnap.empty) {
-    for (const [id, icon, name, description] of defaultServices) {
-      await setDoc(doc(db, "services", id), {
-        icon,
-        name,
-        description,
-        active: true
-      });
-    }
-  }
-
+  // Do not repopulate an intentionally emptied services collection.
+  // Catalog entries are created only by an explicit admin action.
   const siteRef = doc(db, "siteConfig", "main");
   const siteSnap = await getDoc(siteRef);
 
@@ -340,9 +329,21 @@ function renderCustomers() {
   const target = $("customersAdminList"); if (!target) return;
   const q = String($("customerSearch")?.value || "").toLowerCase();
   const list = customers.filter(c => [c.name,c.email,c.phone,c.id].some(v => String(v||"").toLowerCase().includes(q)));
-  target.innerHTML = list.map(c => `<article class="admin-row"><div><b>${esc(c.name || "Pelanggan")}</b><small>${esc(c.email || "")} · UID ${esc(c.id)}<br>WhatsApp: ${esc(c.phone || "Belum diisi")} · Daftar: ${esc(dateValue(c.createdAt) || "Tidak tersedia")}</small></div><span class="status-chip">${c.emailVerified === true ? "Email terverifikasi" : "Menunggu verifikasi"}</span></article>`).join("") || '<p class="muted-note">Belum ada pelanggan yang cocok.</p>';
+  target.innerHTML = list.map(c => `<article class="admin-row"><div><b>${esc(c.name || "Pelanggan")}</b><small>${esc(c.email || "")} · UID ${esc(c.id)}<br>WhatsApp: ${esc(c.phone || "Belum diisi")} · Daftar: ${esc(dateValue(c.createdAt) || "Tidak tersedia")}</small></div><div><span class="status-chip">${c.archived ? "Diarsipkan" : (c.emailVerified === true ? "Email terverifikasi" : "Menunggu verifikasi")}</span><button type="button" class="btn small customer-archive" data-id="${esc(c.id)}" data-archived="${c.archived===true}">${c.archived ? "Pulihkan" : "Arsipkan"}</button></div></article>`).join("") || '<p class="muted-note">Belum ada pelanggan yang cocok.</p>';
 }
 $("customerSearch")?.addEventListener("input", renderCustomers);
+$("customersAdminList")?.addEventListener("click", async e=>{
+  const btn=e.target.closest(".customer-archive"); if(!btn) return;
+  const id=btn.dataset.id, archived=btn.dataset.archived!=="true";
+  if(!confirm(archived ? "Arsipkan pelanggan ini? Akun Firebase Auth tidak dihapus." : "Pulihkan profil pelanggan ini?")) return;
+  btn.disabled=true;
+  try {
+    await updateDoc(doc(db,"customers",id),{archived,archivedAt:serverTimestamp()});
+    logActivity(`${archived?"Mengarsipkan":"Memulihkan"} profil pelanggan ${id}`);
+    await loadCustomers();
+  } catch(err) { alert(showError("Gagal mengubah arsip pelanggan",err)); }
+  finally { btn.disabled=false; }
+});
 $("showArchivedOrders")?.addEventListener("change", renderOrders);
 
 // SIMPAN WEBSITE DAN MAINTENANCE MODE
@@ -694,7 +695,17 @@ const capabilityNames = [
 const capGrid = $("capabilityGrid");
 if (capGrid) capGrid.innerHTML = capabilityNames.map((name,i)=>`<div class="capability-item"><span>${String(i+1).padStart(2,"0")}</span>${esc(name)}</div>`).join("");
 let localActivity=[];
-function logActivity(message){localActivity.unshift({at:new Date().toLocaleString("id-ID"),message});localActivity=localActivity.slice(0,30);const box=$("activityLog");if(box)box.innerHTML=localActivity.map(x=>`<div><small>${esc(x.at)}</small>${esc(x.message)}</div>`).join("")||"<p>Belum ada aktivitas.</p>";}
+function logActivity(message){
+  const at = new Date().toLocaleString("id-ID");
+  localActivity.unshift({at,message}); localActivity=localActivity.slice(0,30);
+  const box=$("activityLog");
+  if(box) box.innerHTML=localActivity.map(x=>`<div><small>${esc(x.at)}</small>${esc(x.message)}</div>`).join("")||"<p>Belum ada aktivitas.</p>";
+  // Best-effort persistent audit trail. Firestore rules restrict writes to enabled admins.
+  if(auth.currentUser) addDoc(collection(db,"adminLogs"),{
+    uid:auth.currentUser.uid, email:auth.currentUser.email||"", action:String(message).slice(0,240),
+    createdAt:serverTimestamp()
+  }).catch(err=>console.warn("Audit log tidak tersimpan:",err.code||err.message));
+}
 function navigatePane(id){document.querySelectorAll(".admin-tab").forEach(t=>t.classList.toggle("active",t.dataset.pane===id));document.querySelectorAll(".admin-pane").forEach(p=>p.classList.toggle("hidden",p.id!==id));}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-jump]");if(b){navigatePane(b.dataset.jump);$(b.dataset.jump)?.scrollIntoView({behavior:"smooth",block:"start"});}});
 function fillDesignForm(data={}){const f=$("designForm");if(!f)return;for(const [k,v] of Object.entries({theme:"matrix",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//",...data})){const el=f.elements.namedItem(k);if(el){if(el.type==="checkbox")el.checked=v===true;else el.value=v??"";}}$("speedOutput").textContent=f.elements.speed.value;$("densityOutput").textContent=f.elements.density.value;}
@@ -761,3 +772,39 @@ $("runDiagnostics")?.addEventListener("click", async () => {
   list.innerHTML = checks.map(x => `<div class="diagnostic-row"><b>${x.ok ? "✓" : "✕"} ${esc(x.name)}</b><small>${esc(x.detail)}</small></div>`).join("");
   logActivity(`Diagnostik dijalankan: ${failed} masalah dari ${checks.length} pemeriksaan`);
 });
+
+
+// Kenseonn Ultimate: admin-controlled feature flags and design presets.
+const featureDefaults = {registrationEnabled:true, orderingEnabled:true, maintenanceEnabled:false, publicCatalogEnabled:true};
+async function loadFeatureManager(){
+  const snap=await getDoc(doc(db,"siteConfig","main"));
+  const data=snap.exists()?snap.data():{};
+  const flags={...featureDefaults,...Object.fromEntries(Object.keys(featureDefaults).map(k=>[k,data[k]!==undefined?data[k]:featureDefaults[k]]))};
+  const form=$("featureForm"); if(!form)return;
+  Object.entries(flags).forEach(([k,v])=>{const el=form.elements.namedItem(k);if(el)el.checked=v===true;});
+}
+$("featureForm")?.addEventListener("submit",async e=>{
+  e.preventDefault(); const form=e.currentTarget, btn=form.querySelector('[type="submit"]');
+  const flags={}; Object.keys(featureDefaults).forEach(k=>flags[k]=form.elements.namedItem(k).checked);
+  btn.disabled=true; showStatus("featureStatus","Menyimpan...");
+  try{
+    await setDoc(doc(db,"siteConfig","main"),flags,{merge:true});
+    showStatus("featureStatus","Pengaturan fitur tersimpan.");
+    logActivity("Memperbarui Feature Manager");
+  }catch(err){showStatus("featureStatus",showError("Gagal menyimpan fitur",err));}
+  finally{btn.disabled=false;}
+});
+const presetDesigns={
+ matrix:{effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",glow:"medium",scanline:true,grid:true},
+ aurora:{effect:"particles",accent:"#8be7ff",accent2:"#b9a4ff",glow:"high",scanline:false,grid:true},
+ violet:{effect:"stars",accent:"#c69aff",accent2:"#64dcff",glow:"high",scanline:true,grid:false},
+ ember:{effect:"snow",accent:"#ff9a67",accent2:"#ffd36e",glow:"medium",scanline:false,grid:true},
+ mono:{effect:"grid",accent:"#d5e0eb",accent2:"#91a2b5",glow:"low",scanline:false,grid:true}
+};
+$("designForm")?.elements.namedItem("theme")?.addEventListener("change",e=>{
+ const preset=presetDesigns[e.target.value]; if(!preset)return;
+ const f=$("designForm"); Object.entries(preset).forEach(([k,v])=>{const el=f.elements.namedItem(k);if(el){if(el.type==="checkbox")el.checked=v;else el.value=v;}});
+ $("previewEffect")?.click();
+});
+const _refreshAllUltimate=refreshAll;
+refreshAll=async function(){await _refreshAllUltimate();try{await loadFeatureManager();}catch(e){console.warn("Feature Manager load:",e);}};

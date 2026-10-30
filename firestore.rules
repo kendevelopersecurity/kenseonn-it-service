@@ -22,12 +22,22 @@ service cloud.firestore {
         && request.resource.data.name.size() <= 80
         && request.resource.data.email == request.auth.token.email;
       allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','updatedAt']);
+      allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','updatedAt','emailVerified'])
+        && (!('emailVerified' in request.resource.data.diff(resource.data).affectedKeys()) || request.auth.token.email_verified == true));
       allow delete: if isAdmin();
+    }
+    match /adminLogs/{logId} {
+      allow create: if isAdmin()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.action.size() <= 240;
+      allow read: if isAdmin();
+      allow update, delete: if false;
     }
     match /orders/{orderId} {
       allow create: if signedIn()
+        && request.auth.token.email_verified == true
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
         && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25

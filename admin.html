@@ -24,7 +24,7 @@
     <section id="dashboard" class="dashboard hidden">
       <header class="admin-header"><div><span class="kicker">CONTROL PANEL</span><h1>Kenseonn Admin</h1></div><button id="logoutBtn" class="btn ghost">Logout</button></header>
       <div class="admin-tabs">
-        <button class="admin-tab active" data-pane="overviewPane">⌂ Overview</button><button class="admin-tab" data-pane="sitePane">Website</button><button class="admin-tab" data-pane="servicesPane">Layanan</button><button class="admin-tab" data-pane="packagesPane">Boosting & Harga</button><button class="admin-tab" data-pane="ordersPane">Pesanan</button><button class="admin-tab" data-pane="customersPane">Pelanggan</button><button class="admin-tab" data-pane="designPane">Design Lab</button><button class="admin-tab" data-pane="analyticsPane">Analytics</button><button class="admin-tab" data-pane="systemPane">System Tools</button>
+        <button class="admin-tab active" data-pane="overviewPane">⌂ Overview</button><button class="admin-tab" data-pane="sitePane">Website</button><button class="admin-tab" data-pane="servicesPane">Layanan</button><button class="admin-tab" data-pane="packagesPane">Boosting & Harga</button><button class="admin-tab" data-pane="ordersPane">Pesanan</button><button class="admin-tab" data-pane="customersPane">Pelanggan</button><button class="admin-tab" data-pane="designPane">Design Lab</button><button class="admin-tab" data-pane="featuresPane">Feature Manager</button><button class="admin-tab" data-pane="analyticsPane">Analytics</button><button class="admin-tab" data-pane="systemPane">System Tools</button>
       </div>
 
       <div id="overviewPane" class="admin-pane">
@@ -96,6 +96,21 @@
             <label class="wide">Teks logo / monogram<input name="logoText" maxlength="12" placeholder="K//"></label>
             <div class="wide action-row"><button class="btn primary">Simpan & Terapkan Desain</button><button type="button" id="previewEffect" class="btn ghost">Preview efek</button><span id="designStatus" class="form-status"></span></div>
           </form><div id="effectPreview" class="effect-preview"><span>LIVE EFFECT PREVIEW</span></div>
+        </div>
+      </div>
+
+      <div id="featuresPane" class="admin-pane hidden">
+        <div class="admin-card">
+          <span class="kicker">MODULE CONTROL</span><h2>Feature Manager</h2>
+          <p>Pengaturan modul dasar website. Perubahan disimpan di siteConfig/main. Modul sensitif tetap memerlukan validasi backend sebelum diaktifkan.</p>
+          <form id="featureForm" class="form-grid">
+            <label class="toggle-line"><input type="checkbox" name="registrationEnabled"> Registrasi pelanggan</label>
+            <label class="toggle-line"><input type="checkbox" name="orderingEnabled"> Penerimaan order</label>
+            <label class="toggle-line"><input type="checkbox" name="maintenanceEnabled"> Maintenance mode</label>
+            <label class="toggle-line"><input type="checkbox" name="publicCatalogEnabled"> Katalog layanan publik</label>
+            <div class="wide"><button class="btn primary" type="submit">Simpan pengaturan fitur</button><span id="featureStatus" class="form-status"></span></div>
+          </form>
+          <p class="muted-note">Belum termasuk kontrol untuk bot AI, payment gateway, push notification, API provider, atau penghapusan akun Authentication.</p>
         </div>
       </div>
       <div id="analyticsPane" class="admin-pane hidden">
