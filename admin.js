@@ -102,6 +102,21 @@ function getFormValue(form, name) {
   return form.elements.namedItem(name);
 }
 
+
+// Local-only design and social settings: no Firestore writes, no Rules changes.
+const DESIGN_KEY="kenseonn.design.v1", SOCIAL_KEY="kenseonn.social.v1";
+const designDefaults={accent:"#7cf29a",accent2:"#63a7ff",bg:"#06080d",panel:"#0c1119",effect:"cyber",animation:"on",intensity:"medium",particles:true};
+const socialDefaults={instagram:"",tiktok:"",facebook:"",youtube:"",telegram:"",whatsapp:"",discord:"",github:"",x:"",linkedin:""};
+function localRead(key,fallback){try{return {...fallback,...JSON.parse(localStorage.getItem(key)||"{}")}}catch{return {...fallback}}}
+function fillLocalForm(form,data){if(!form)return;for(const [k,v] of Object.entries(data)){const field=form.elements.namedItem(k);if(field){if(field.type==="checkbox")field.checked=!!v;else field.value=v??""}}}
+function collectLocalForm(form){const out={};for(const el of form.elements){if(!el.name)continue;out[el.name]=el.type==="checkbox"?el.checked:el.value.trim()}return out}
+fillLocalForm($("designForm"),localRead(DESIGN_KEY,designDefaults));
+fillLocalForm($("socialForm"),localRead(SOCIAL_KEY,socialDefaults));
+$("designForm")?.addEventListener("submit",async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type="submit"]');setBusy(button,true);try{const design=collectLocalForm(event.currentTarget);await setDoc(doc(db,"siteConfig","main"),{design},{merge:true});showStatus("designStatus","Desain berhasil disimpan ke konfigurasi website ✓")}catch(error){showStatus("designStatus",showError("Gagal menyimpan desain",error))}finally{setBusy(button,false)}});
+$("socialForm")?.addEventListener("submit",async event=>{event.preventDefault();const data=collectLocalForm(event.currentTarget);for(const [key,value] of Object.entries(data)){if(!value)continue;try{const u=new URL(value);if(!["https:","http:"].includes(u.protocol))throw 0}catch{showStatus("socialStatus",`URL ${key} tidak valid. Gunakan https://`);return}}const button=event.currentTarget.querySelector('[type="submit"]');setBusy(button,true);try{await setDoc(doc(db,"siteConfig","main"),{social:data},{merge:true});showStatus("socialStatus","Link media sosial tersimpan dan dipublikasikan ✓")}catch(error){showStatus("socialStatus",showError("Gagal menyimpan media sosial",error))}finally{setBusy(button,false)}});
+$("resetDesign")?.addEventListener("click",async()=>{fillLocalForm($("designForm"),designDefaults);const button=$("resetDesign");setBusy(button,true);try{await setDoc(doc(db,"siteConfig","main"),{design:designDefaults},{merge:true});showStatus("designStatus","Desain default berhasil diterapkan ✓")}catch(error){showStatus("designStatus",showError("Gagal reset desain",error))}finally{setBusy(button,false)}});
+document.querySelectorAll(".theme-preset").forEach(button=>button.addEventListener("click",()=>{const presets={matrix:{accent:"#00ff88",accent2:"#00d9ff",bg:"#020806",panel:"#07130d",effect:"matrix"},ice:{accent:"#70e7ff",accent2:"#8daeff",bg:"#050b14",panel:"#0b1725",effect:"cyber"},purple:{accent:"#c084fc",accent2:"#818cf8",bg:"#090612",panel:"#151024",effect:"neon"},red:{accent:"#ff647c",accent2:"#ffb86b",bg:"#100609",panel:"#1b0c12",effect:"neon"}};const current=localRead(DESIGN_KEY,designDefaults);fillLocalForm($("designForm"),{...current,...presets[button.dataset.theme]});showStatus("designStatus","Preset dipilih. Klik Terapkan & Simpan Desain untuk menyimpan.")}));
+
 // LOGIN DAN PEMERIKSAAN ADMIN
 
 onAuthStateChanged(auth, async user => {
@@ -252,6 +267,8 @@ async function loadSite() {
   if (!snapshot.exists()) return;
 
   const data = snapshot.data();
+  fillLocalForm($("designForm"),{...designDefaults,...(data.design||{})});
+  fillLocalForm($("socialForm"),{...socialDefaults,...(data.social||{})});
   const form = $("siteForm");
   if (!form) return;
 

@@ -81,6 +81,37 @@ function showOrderStatus(message, success = false) {
   el.style.color = success ? "#86ffad" : "#ffb4b4";
 }
 
+
+// Appearance/social controls are intentionally browser-local.
+// This avoids adding Firestore collections or changing existing security rules.
+const LOCAL_DESIGN_KEY = "kenseonn.design.v1";
+const LOCAL_SOCIAL_KEY = "kenseonn.social.v1";
+const defaultDesign = {accent:"#7cf29a",accent2:"#63a7ff",bg:"#06080d",panel:"#0c1119",effect:"cyber",animation:"on",intensity:"medium",particles:true};
+const socialLabels = {instagram:"Instagram",tiktok:"TikTok",facebook:"Facebook",youtube:"YouTube",telegram:"Telegram",whatsapp:"WhatsApp",discord:"Discord",github:"GitHub",x:"X / Twitter",linkedin:"LinkedIn"};
+function readLocal(key, fallback){try{return {...fallback,...JSON.parse(localStorage.getItem(key)||"{}")}}catch{return {...fallback}}}
+function safeSocialUrl(value){
+  try{const u=new URL(value);return ["https:","http:"].includes(u.protocol)?u.href:""}catch{return ""}
+}
+function applyLocalDesign(){
+  const d={...defaultDesign,...(site.design||readLocal(LOCAL_DESIGN_KEY,{}))}, root=document.documentElement;
+  root.style.setProperty("--accent",d.accent);root.style.setProperty("--accent2",d.accent2);
+  root.style.setProperty("--bg",d.bg);root.style.setProperty("--panel",d.panel);
+  document.body.classList.toggle("animations-off",d.animation==="off");
+  document.body.classList.remove("fx-neon","fx-matrix","fx-minimal","intensity-low","intensity-high");
+  if(d.effect==="neon")document.body.classList.add("fx-neon");
+  if(d.effect==="matrix")document.body.classList.add("fx-matrix");
+  if(d.effect==="minimal")document.body.classList.add("fx-minimal");
+  document.body.classList.add("intensity-"+(d.intensity||"medium"));
+  let layer=document.querySelector(".particle-layer");
+  if(d.particles && !layer){layer=document.createElement("div");layer.className="particle-layer";layer.setAttribute("aria-hidden","true");for(let i=0;i<26;i++){const dot=document.createElement("i");dot.style.left=(i*37%100)+"%";dot.style.animationDelay=(-i*.47)+"s";dot.style.animationDuration=(9+i%8)+"s";layer.append(dot)}document.body.prepend(layer)}
+  if(!d.particles)layer?.remove();
+}
+function renderSocialLinks(){
+  const holder=byId("socialLinks");if(!holder)return;
+  const social={instagram:site.instagram?`https://instagram.com/${site.instagram}`:"",whatsapp:site.whatsapp?`https://wa.me/${String(site.whatsapp).replace(/\D/g,"")}`:"",...(site.social||readLocal(LOCAL_SOCIAL_KEY,{}))};
+  holder.innerHTML=Object.entries(socialLabels).map(([key,label])=>{const url=safeSocialUrl(social[key]||"");return url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:""}).join("");
+}
+
 async function loadData() {
   try {
     const [serviceSnap, packageSnap, siteSnap] = await Promise.all([
@@ -373,3 +404,5 @@ if (orderForm) {
 }
 
 loadData();
+
+window.addEventListener("storage", event => { if([LOCAL_DESIGN_KEY,LOCAL_SOCIAL_KEY].includes(event.key)){applyLocalDesign();renderSocialLinks();} });

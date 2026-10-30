@@ -4,3 +4,22 @@
 @media(max-width:600px){.section{padding:65px 17px}.hero{min-height:auto;padding-top:70px}.hero h1{font-size:48px}.service-grid,.packages-grid,.form-grid,.stats{grid-template-columns:1fr}.section-head{display:block}.section-head p{margin-top:16px}.order-panel{padding:22px}.admin-wrap{padding:25px 14px}.admin-row{grid-template-columns:1fr auto}.admin-row .danger{grid-column:auto}.admin-header{align-items:center}footer{display:block;line-height:2.2}}
 
 .maintenance-screen{position:fixed;inset:0;z-index:1000;background:radial-gradient(circle at 50% 20%,rgba(124,242,154,.07),transparent 35%),#06080d;display:grid;place-items:center;padding:22px}.maintenance-box{width:min(650px,100%);text-align:center;background:rgba(12,17,25,.94);border:1px solid var(--line);border-radius:22px;padding:48px 28px;box-shadow:var(--shadow)}.maintenance-icon{width:64px;height:64px;margin:0 auto 22px;border:1px solid rgba(124,242,154,.4);border-radius:18px;display:grid;place-items:center;font-size:28px;color:var(--accent);animation:spinSlow 5s linear infinite}.maintenance-box h1{font-size:clamp(32px,6vw,52px);line-height:1.05;margin:10px 0}.maintenance-box>p{color:var(--muted);max-width:500px;margin:0 auto}.maintenance-status{display:inline-flex;align-items:center;gap:8px;margin:25px 0 8px;color:var(--accent);font-size:11px;font-weight:900;letter-spacing:.16em}.pulse{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 0 0 rgba(124,242,154,.5);animation:pulse 1.6s infinite}.countdown{font:900 clamp(38px,8vw,66px)/1 ui-monospace,monospace;letter-spacing:.08em;margin:10px 0 25px}.maintenance-actions{display:flex;justify-content:center;gap:10px}.maintenance-note{font-size:12px!important;margin-top:25px!important}.maintenance-note a{color:var(--accent)}body.maintenance-active>main,body.maintenance-active>header,body.maintenance-active>footer{display:none!important}.maintenance-admin{border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:8px}.maintenance-admin h3{margin:0 0 12px;color:var(--text)}.toggle-line{flex-direction:row;align-items:center;margin-bottom:15px}.toggle-line input{width:auto}.maintenance-admin .form-grid{margin-top:10px}@keyframes spinSlow{to{transform:rotate(360deg)}}@keyframes pulse{70%{box-shadow:0 0 0 9px rgba(124,242,154,0)}100%{box-shadow:0 0 0 0 rgba(124,242,154,0)}}
+/* KENSEONN ULTIMATE: browser-local visual controls */
+:root{--accent:#7cf29a;--accent2:#63a7ff;--bg:#06080d;--panel:#0c1119}
+body{background:var(--bg)}
+body.fx-neon .service-card,body.fx-neon .price-card{box-shadow:0 0 24px color-mix(in srgb,var(--accent) 18%,transparent)}
+body.fx-matrix .bg-grid{opacity:.55;background-size:30px 30px}
+body.fx-minimal .bg-grid{opacity:.08}
+body.animations-off *,body.animations-off *:before,body.animations-off *:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+body.intensity-high .terminal-card,body.intensity-high .about-card{box-shadow:0 0 42px color-mix(in srgb,var(--accent) 18%,transparent)}
+body.intensity-low .bg-grid{opacity:.12}
+.design-presets{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.social-links{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.social-links a{border:1px solid var(--line);background:var(--panel);padding:9px 13px;border-radius:10px;font-size:13px;font-weight:700;transition:transform .2s,border-color .2s}
+.social-links a:hover{transform:translateY(-3px);border-color:var(--accent);color:var(--accent)}
+.particle-layer{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.particle-layer i{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--accent);opacity:.5;box-shadow:0 0 10px var(--accent);animation:floatParticle 12s linear infinite}
+@keyframes floatParticle{from{transform:translate3d(0,105vh,0);opacity:0}15%{opacity:.55}to{transform:translate3d(45px,-10vh,0);opacity:0}}
+.admin-card input[type=color]{height:46px;padding:4px}
+.admin-card input[type=checkbox]{width:auto}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
