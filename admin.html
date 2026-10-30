@@ -70,6 +70,50 @@
       <div id="ordersPane" class="admin-pane hidden">
         <div class="admin-card"><div class="list-head"><h2>Order Masuk</h2><button id="refreshOrders" class="btn ghost">Refresh</button></div><div id="ordersAdminList" class="orders-list"></div></div>
       </div>
+
+      <div id="designPane" class="admin-pane hidden">
+        <div class="admin-card">
+          <h2>Design Studio</h2>
+          <p>Atur warna, efek visual, dan animasi website. Perubahan disimpan pada dokumen konfigurasi website yang sudah ada.</p>
+          <div class="theme-presets">
+            <button type="button" class="btn ghost theme-preset" data-theme="matrix">Matrix</button>
+            <button type="button" class="btn ghost theme-preset" data-theme="ice">Ice</button>
+            <button type="button" class="btn ghost theme-preset" data-theme="purple">Purple</button>
+            <button type="button" class="btn ghost theme-preset" data-theme="red">Red</button>
+          </div>
+          <form id="designForm" class="form-grid">
+            <label>Warna utama<input type="color" name="accent" value="#7cf29a"></label>
+            <label>Warna kedua<input type="color" name="accent2" value="#63a7ff"></label>
+            <label>Warna latar<input type="color" name="bg" value="#06080d"></label>
+            <label>Warna panel<input type="color" name="panel" value="#0c1119"></label>
+            <label>Efek visual<select name="effect"><option value="cyber">Cyber</option><option value="neon">Neon Glow</option><option value="matrix">Matrix</option><option value="minimal">Minimal</option></select></label>
+            <label>Intensitas efek<select name="intensity"><option value="low">Rendah</option><option value="medium">Sedang</option><option value="high">Tinggi</option></select></label>
+            <label>Animasi<select name="animation"><option value="on">Aktif</option><option value="off">Nonaktif</option></select></label>
+            <label class="toggle-line"><input type="checkbox" name="particles"> Aktifkan partikel animasi</label>
+            <div class="wide"><button type="submit" class="btn primary">Terapkan & Simpan Desain</button> <button type="button" id="resetDesign" class="btn ghost">Reset Default</button><div id="designStatus" class="form-status"></div></div>
+          </form>
+        </div>
+      </div>
+
+      <div id="socialPane" class="admin-pane hidden">
+        <div class="admin-card">
+          <h2>Social Media</h2>
+          <p>Masukkan tautan lengkap akun media sosial. Kolom yang dikosongkan tidak akan ditampilkan di website.</p>
+          <form id="socialForm" class="form-grid">
+            <label>Instagram URL<input type="url" name="instagram" placeholder="https://instagram.com/username"></label>
+            <label>TikTok URL<input type="url" name="tiktok" placeholder="https://tiktok.com/@username"></label>
+            <label>Facebook URL<input type="url" name="facebook" placeholder="https://facebook.com/username"></label>
+            <label>YouTube URL<input type="url" name="youtube" placeholder="https://youtube.com/@channel"></label>
+            <label>WhatsApp URL<input type="url" name="whatsapp" placeholder="https://wa.me/628xxxxxxxxxx"></label>
+            <label>Telegram URL<input type="url" name="telegram" placeholder="https://t.me/username"></label>
+            <label>Discord URL<input type="url" name="discord" placeholder="https://discord.gg/invite"></label>
+            <label>GitHub URL<input type="url" name="github" placeholder="https://github.com/username"></label>
+            <label>X / Twitter URL<input type="url" name="x" placeholder="https://x.com/username"></label>
+            <label>LinkedIn URL<input type="url" name="linkedin" placeholder="https://linkedin.com/in/username"></label>
+            <div class="wide"><button type="submit" class="btn primary">Simpan Social Media</button><div id="socialStatus" class="form-status"></div></div>
+          </form>
+        </div>
+      </div>
     </section>
   </main>
   <script type="module" src="admin.js"></script>
