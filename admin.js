@@ -136,7 +136,7 @@ onAuthStateChanged(auth, async user => {
     const adminSnap = await getDoc(adminRef);
 
     if (!adminSnap.exists() || adminSnap.data().enabled !== true) {
-      showStatus("loginStatus", "Akun ini belum diberi akses admin.");
+      showStatus("loginStatus", `Login Firebase berhasil, tetapi UID ini belum diaktifkan sebagai admin. UID: ${user.uid}. Buat dokumen admins/${user.uid} dengan enabled: true di Firestore.`);
       await signOut(auth);
       return;
     }
@@ -172,7 +172,14 @@ $("loginForm")?.addEventListener("submit", async event => {
     );
   } catch (error) {
     if (error.code === "auth/too-many-requests") sessionStorage.setItem(adminLoginCooldownKey, String(Date.now()+15*60*1000));
-    const message = error.code === "auth/too-many-requests" ? "Firebase membatasi login sementara. Tunggu 15 menit dan jangan klik berulang." : error.code === "auth/invalid-credential" ? "Email atau password admin tidak sesuai." : `${error.code || error.message}`;
+    const messages = {
+      "auth/too-many-requests": "Firebase membatasi login sementara. Tunggu 15 menit.",
+      "auth/invalid-credential": "Email atau password admin tidak sesuai.",
+      "auth/user-disabled": "Akun admin dinonaktifkan di Firebase Authentication.",
+      "auth/network-request-failed": "Koneksi internet gagal menghubungi Firebase.",
+      "auth/operation-not-allowed": "Login Email/Password belum diaktifkan di Firebase Authentication."
+    };
+    const message = messages[error.code] || `${error.code || error.message}`;
     showStatus("loginStatus", `Login gagal: ${message}`);
   } finally {
     setBusy(button, false);

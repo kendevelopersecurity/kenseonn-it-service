@@ -12,6 +12,11 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, sendEmailVerification, reload } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+
+const emailVerificationSettings = {
+  url: "https://kendevelopersecurity.github.io/kenseonn-it-service/?emailVerification=1",
+  handleCodeInApp: false
+};
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
@@ -385,11 +390,34 @@ byId("registerForm")?.addEventListener("submit", async event => {
     button.disabled = true; setText("registerStatus", "Membuat akun...");
     const credential = await createUserWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password")));
     await updateProfile(credential.user, { displayName: String(data.get("name")).trim() });
-    await setDoc(doc(db, "customers", credential.user.uid), { name: String(data.get("name")).trim(), email: credential.user.email, emailVerified: false, createdAt: serverTimestamp() }, { merge: true });
-    await sendEmailVerification(credential.user);
+    // Kirim email verifikasi lebih dulu agar kegagalan tulis profil Firestore
+    // tidak membuat pengguna kehilangan kesempatan menerima tautan verifikasi.
+    await sendEmailVerification(credential.user, emailVerificationSettings);
+    try {
+      await setDoc(doc(db, "customers", credential.user.uid), {
+        name: String(data.get("name")).trim(),
+        email: credential.user.email,
+        emailVerified: false,
+        createdAt: serverTimestamp()
+      }, { merge: true });
+    } catch (profileError) {
+      console.error("Profil pelanggan belum tersimpan:", profileError);
+    }
     await signOut(auth);
-    form.reset(); setText("registerStatus", "Akun dibuat. Kami mengirim email verifikasi ke Gmail Anda. Buka email dari Firebase lalu klik tautan verifikasi. Setelah itu silakan login.");
-  } catch(err) { setText("registerStatus", err.code === "auth/email-already-in-use" ? "Email sudah terdaftar. Silakan login." : `Pendaftaran gagal: ${err.code || err.message}`); }
+    form.reset();
+    setText("registerStatus", "Akun berhasil dibuat dan tautan verifikasi baru telah dikirim. Gunakan tautan TERBARU dari email Firebase. Jika tautan lama kedaluwarsa, abaikan dan buka email terbaru. Periksa Spam/Promosi.");
+  } catch(err) {
+    const messages = {
+      "auth/email-already-in-use": "Email sudah terdaftar. Masuk menggunakan akun tersebut.",
+      "auth/invalid-email": "Format email tidak valid.",
+      "auth/weak-password": "Password terlalu lemah. Gunakan minimal 8 karakter.",
+      "auth/operation-not-allowed": "Pendaftaran Email/Password belum diaktifkan di Firebase Authentication.",
+      "auth/unauthorized-continue-uri": "Domain tautan verifikasi belum diizinkan. Tambahkan kendevelopersecurity.github.io ke Authorized domains Firebase Authentication.",
+      "auth/too-many-requests": "Terlalu banyak percobaan. Tunggu sebentar sebelum mencoba lagi."
+    };
+    setText("registerStatus", `Pendaftaran gagal: ${messages[err.code] || err.code || err.message}`);
+    if (auth.currentUser) await signOut(auth).catch(() => {});
+  }
   finally { button.disabled = false; }
 });
 
@@ -399,7 +427,27 @@ byId("customerLoginForm")?.addEventListener("submit", async event => {
   const until = Number(sessionStorage.getItem(loginCooldownKey) || 0), remaining = until - Date.now();
   if (remaining > 0) { setText("customerLoginStatus", `Terlalu banyak percobaan. Coba lagi dalam ${Math.ceil(remaining/60000)} menit.`); return; }
   if (button.disabled) return;
-  try { button.disabled = true; setText("customerLoginStatus", "Memproses login..."); const credential = await signInWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password"))); await reload(credential.user); if (!credential.user.emailVerified) { await signOut(auth); setText("customerLoginStatus", "Email belum diverifikasi. Periksa Gmail dan klik tautan verifikasi sebelum masuk."); return; } await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, emailVerified: true, updatedAt: serverTimestamp() }, { merge: true }); sessionStorage.removeItem(loginCooldownKey); form.reset(); setText("customerLoginStatus", "Login berhasil."); }
+  try {
+    button.disabled = true;
+    setText("customerLoginStatus", "Memproses login...");
+    const credential = await signInWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password")));
+    await reload(credential.user);
+    if (!credential.user.emailVerified) {
+      try {
+        await sendEmailVerification(credential.user, emailVerificationSettings);
+        await signOut(auth);
+        setText("customerLoginStatus", "Email belum terverifikasi. Kami baru saja mengirim ulang tautan verifikasi. Gunakan email TERBARU dari Firebase; tautan lama yang kedaluwarsa tidak bisa dipakai.");
+      } catch (mailError) {
+        await signOut(auth).catch(() => {});
+        setText("customerLoginStatus", `Email belum terverifikasi dan pengiriman ulang gagal: ${mailError.code || mailError.message}. Periksa Authorized domains Firebase.`);
+      }
+      return;
+    }
+    await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, emailVerified: true, updatedAt: serverTimestamp() }, { merge: true });
+    sessionStorage.removeItem(loginCooldownKey);
+    form.reset();
+    setText("customerLoginStatus", "Login berhasil.");
+  }
   catch(err) {
     if (err.code === "auth/too-many-requests") sessionStorage.setItem(loginCooldownKey, String(Date.now()+15*60*1000));
     const messages = {"auth/too-many-requests":"Firebase membatasi percobaan sementara. Tunggu 15 menit sebelum mencoba lagi.","auth/invalid-credential":"Email atau password tidak sesuai.","auth/user-not-found":"Akun tidak ditemukan.","auth/wrong-password":"Password tidak benar.","auth/network-request-failed":"Koneksi internet bermasalah."};
