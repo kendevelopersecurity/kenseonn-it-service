@@ -42,16 +42,36 @@ let orders = [];
 let busy = false;
 
 const defaultServices = [
-  ["security-assessment", "🛡️", "Cek Keamanan Website", "Audit keamanan website secara berizin."],
-  ["wifi-audit", "📡", "Cek Keamanan WiFi", "Assessment keamanan jaringan WiFi milik klien."],
-  ["cctv-audit", "📹", "Cek Keamanan CCTV", "Audit konfigurasi CCTV milik klien."],
-  ["mobile-security", "📱", "Mobile Security Testing", "Pengujian keamanan aplikasi secara berizin."],
-  ["wa-security", "💬", "WhatsApp Security", "Bantuan keamanan akun dan privasi."],
-  ["link-security", "🔗", "Link Security Assessment", "Pemeriksaan keamanan URL dan domain."],
-  ["social-boost", "📈", "Boosting All Medsos", "Layanan digital marketing."],
-  ["private-training", "🎓", "Private Ethical Hacking", "Pelatihan keamanan siber secara legal."],
-  ["osint-audit", "🔎", "OSINT & Exposure Check", "Pemeriksaan exposure informasi yang sah."],
-  ["custom-development", "🧩", "Custom Security Tool / Script", "Pembuatan tools defensif dan automation."]
+  ['security-assessment', '🛡️', 'Audit Keamanan Website', 'Pemeriksaan konfigurasi dan risiko keamanan website milik klien.'],
+  ['wifi-audit', '📡', 'Audit Keamanan WiFi', 'Pemeriksaan keamanan jaringan WiFi dengan izin pemilik.'],
+  ['cctv-audit', '📹', 'Audit CCTV & NVR', 'Review konfigurasi, akses, firmware, dan keamanan perangkat CCTV.'],
+  ['mobile-security', '📱', 'Mobile App Security Review', 'Review keamanan aplikasi Android/iOS dengan izin.'],
+  ['wa-security', '💬', 'Konsultasi Keamanan WhatsApp', 'Panduan privasi, keamanan akun, dan pemulihan akses resmi.'],
+  ['domain-check', '🌐', 'Pemeriksaan Domain & DNS', 'Pemeriksaan DNS, konfigurasi domain, dan keamanan dasar.'],
+  ['ssl-setup', '🔒', 'Instalasi SSL/TLS', 'Konfigurasi sertifikat HTTPS untuk domain yang dikelola klien.'],
+  ['website-maintenance', '🧰', 'Maintenance Website', 'Pembaruan, perbaikan bug, dan pengecekan rutin website.'],
+  ['wordpress-care', '📰', 'WordPress Care', 'Update plugin/tema, hardening dasar, backup, dan troubleshooting.'],
+  ['malware-cleanup', '🧹', 'Pembersihan Malware Website', 'Pemeriksaan dan pembersihan malware pada website milik klien.'],
+  ['backup-restore', '💾', 'Backup & Restore Website', 'Pembuatan backup dan pemulihan file/database.'],
+  ['web-development', '💻', 'Pembuatan Website', 'Landing page, company profile, katalog, atau website custom.'],
+  ['web-redesign', '🎨', 'Redesign UI Website', 'Penyegaran antarmuka, responsif, dan pengalaman pengguna.'],
+  ['hosting-setup', '☁️', 'Setup Hosting & Deployment', 'Konfigurasi hosting, domain, SSL, dan deployment.'],
+  ['email-business', '✉️', 'Setup Email Bisnis', 'Konfigurasi email domain dan DNS email.'],
+  ['database-setup', '🗄️', 'Setup Database', 'Perancangan database dan konfigurasi akses sesuai kebutuhan.'],
+  ['firebase-setup', '🔥', 'Firebase Setup', 'Setup Firebase Auth, Firestore, Hosting, dan security rules.'],
+  ['automation-script', '⚙️', 'Automation Script', 'Script otomasi untuk workflow yang sah dan disetujui.'],
+  ['bot-development', '🤖', 'Bot & Integration Development', 'Bot layanan/integrasi API untuk penggunaan yang sah.'],
+  ['api-integration', '🔌', 'API Integration', 'Integrasi API resmi antar aplikasi dan layanan.'],
+  ['pc-troubleshoot', '🖥️', 'Troubleshooting PC/Laptop', 'Diagnosa software, sistem operasi, dan performa perangkat.'],
+  ['android-support', '📲', 'Android Troubleshooting', 'Bantuan konfigurasi, backup, dan pemecahan masalah Android.'],
+  ['network-setup', '🕸️', 'Setup Jaringan LAN', 'Perencanaan dan konfigurasi jaringan lokal.'],
+  ['osint-audit', '🔎', 'OSINT Exposure Review', 'Pemeriksaan paparan informasi publik secara etis dan sah.'],
+  ['security-training', '🎓', 'Private Cybersecurity Training', 'Pelatihan dasar keamanan siber dan praktik defensif.'],
+  ['custom-development', '🧩', 'Custom Software Development', 'Pembuatan aplikasi atau tools sesuai ruang lingkup proyek.'],
+  ['social-marketing', '📈', 'Social Media Marketing', 'Konsultasi kampanye dan pemasaran media sosial.'],
+  ['content-design', '🖼️', 'Desain Konten Digital', 'Desain aset visual untuk kebutuhan digital.'],
+  ['seo-audit', '📊', 'SEO Basic Audit', 'Audit dasar struktur SEO teknis dan konten website.'],
+  ['consultation', '🧑\u200d💼', 'Konsultasi IT', 'Konsultasi kebutuhan IT, estimasi pekerjaan, dan rekomendasi solusi.']
 ];
 
 const defaultPackages = (() => {
@@ -102,21 +122,6 @@ function getFormValue(form, name) {
   return form.elements.namedItem(name);
 }
 
-
-// Local-only design and social settings: no Firestore writes, no Rules changes.
-const DESIGN_KEY="kenseonn.design.v1", SOCIAL_KEY="kenseonn.social.v1";
-const designDefaults={accent:"#00f5a0",accent2:"#31c8ff",bg:"#05080d",panel:"#0a121b",effect:"matrix",animation:"on",intensity:"medium",particles:true,speed:"5",density:"60",logoText:"K",heroBadge:"DIGITAL SERVICE • ONLINE",grid:true,scanline:true,glow:true};
-const socialDefaults={instagram:"",tiktok:"",facebook:"",youtube:"",telegram:"",whatsapp:"",discord:"",github:"",x:"",linkedin:""};
-function localRead(key,fallback){try{return {...fallback,...JSON.parse(localStorage.getItem(key)||"{}")}}catch{return {...fallback}}}
-function fillLocalForm(form,data){if(!form)return;for(const [k,v] of Object.entries(data)){const field=form.elements.namedItem(k);if(field){if(field.type==="checkbox")field.checked=!!v;else field.value=v??""}}}
-function collectLocalForm(form){const out={};for(const el of form.elements){if(!el.name)continue;out[el.name]=el.type==="checkbox"?el.checked:el.value.trim()}return out}
-fillLocalForm($("designForm"),localRead(DESIGN_KEY,designDefaults));
-fillLocalForm($("socialForm"),localRead(SOCIAL_KEY,socialDefaults));
-$("designForm")?.addEventListener("submit",async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type="submit"]');setBusy(button,true);try{const design=collectLocalForm(event.currentTarget);await setDoc(doc(db,"siteConfig","main"),{design},{merge:true});showStatus("designStatus","Desain berhasil disimpan ke konfigurasi website ✓")}catch(error){showStatus("designStatus",showError("Gagal menyimpan desain",error))}finally{setBusy(button,false)}});
-$("socialForm")?.addEventListener("submit",async event=>{event.preventDefault();const data=collectLocalForm(event.currentTarget);for(const [key,value] of Object.entries(data)){if(!value)continue;try{const u=new URL(value);if(!["https:","http:"].includes(u.protocol))throw 0}catch{showStatus("socialStatus",`URL ${key} tidak valid. Gunakan https://`);return}}const button=event.currentTarget.querySelector('[type="submit"]');setBusy(button,true);try{await setDoc(doc(db,"siteConfig","main"),{social:data},{merge:true});showStatus("socialStatus","Link media sosial tersimpan dan dipublikasikan ✓")}catch(error){showStatus("socialStatus",showError("Gagal menyimpan media sosial",error))}finally{setBusy(button,false)}});
-$("resetDesign")?.addEventListener("click",async()=>{fillLocalForm($("designForm"),designDefaults);const button=$("resetDesign");setBusy(button,true);try{await setDoc(doc(db,"siteConfig","main"),{design:designDefaults},{merge:true});showStatus("designStatus","Desain default berhasil diterapkan ✓")}catch(error){showStatus("designStatus",showError("Gagal reset desain",error))}finally{setBusy(button,false)}});
-document.querySelectorAll(".theme-preset").forEach(button=>button.addEventListener("click",()=>{const presets={matrix:{accent:"#00ff88",accent2:"#00d9ff",bg:"#020806",panel:"#07130d",effect:"matrix"},ice:{accent:"#70e7ff",accent2:"#8daeff",bg:"#050b14",panel:"#0b1725",effect:"cyber"},purple:{accent:"#c084fc",accent2:"#818cf8",bg:"#090612",panel:"#151024",effect:"neon"},red:{accent:"#ff647c",accent2:"#ffb86b",bg:"#100609",panel:"#1b0c12",effect:"neon"},ocean:{accent:"#28d7ff",accent2:"#477bff",bg:"#04101a",panel:"#0a1d2b",effect:"stars"},snow:{accent:"#d9f4ff",accent2:"#85cfff",bg:"#07111b",panel:"#102234",effect:"snow"},emerald:{accent:"#00ff9d",accent2:"#00d9a6",bg:"#020c09",panel:"#071b13",effect:"matrix"}};const current=localRead(DESIGN_KEY,designDefaults);fillLocalForm($("designForm"),{...current,...presets[button.dataset.theme]});showStatus("designStatus","Preset dipilih. Klik Terapkan & Simpan Desain untuk menyimpan.")}));
-
 // LOGIN DAN PEMERIKSAAN ADMIN
 
 onAuthStateChanged(auth, async user => {
@@ -142,12 +147,6 @@ onAuthStateChanged(auth, async user => {
     $("dashboard")?.classList.remove("hidden");
 
     await refreshAll();
-
-    // Populate Design Studio and Social Media forms from the existing siteConfig/main document.
-    const siteConfigSnap = await getDoc(doc(db, "siteConfig", "main"));
-    const savedSiteConfig = siteConfigSnap.exists() ? siteConfigSnap.data() : {};
-    fillLocalForm($("designForm"), { ...designDefaults, ...(savedSiteConfig.design || {}) });
-    fillLocalForm($("socialForm"), { ...socialDefaults, ...(savedSiteConfig.social || {}) });
   } catch (error) {
     showStatus("loginStatus", showError("Gagal memuat admin panel", error));
     $("dashboard")?.classList.add("hidden");
@@ -261,9 +260,6 @@ async function refreshAll() {
       loadPackages(),
       loadOrders()
     ]);
-    const cfg = await getDoc(doc(db, "siteConfig", "main"));
-    const saved = cfg.exists() ? cfg.data() : {};
-    fillLocalForm($("designForm"), {...designDefaults, ...(saved.design || {})});
 
     showStatus("siteStatus", "Data berhasil dimuat ✓");
   } catch (error) {
@@ -276,8 +272,6 @@ async function loadSite() {
   if (!snapshot.exists()) return;
 
   const data = snapshot.data();
-  fillLocalForm($("designForm"),{...designDefaults,...(data.design||{})});
-  fillLocalForm($("socialForm"),{...socialDefaults,...(data.social||{})});
   const form = $("siteForm");
   if (!form) return;
 
@@ -523,20 +517,19 @@ function renderOrders() {
   if (!container) return;
 
   container.innerHTML = orders.map(item => `
-    <div class="order-row">
+    <div class="order-row order-row-expanded">
       <div>
-        <b>${esc(item.name || "Tanpa nama")} • ${esc(item.service || "")}</b>
-        <small>${esc(item.phone || "")} ${item.email ? "• " + esc(item.email) : ""}</small>
+        <b>${esc(item.orderCode || item.id)} · ${esc(item.name || "Tanpa nama")} • ${esc(item.service || "")}</b>
+        <small>${esc(item.phone || "")} ${item.email ? "• " + esc(item.email) : ""} · ${esc(dateValue(item.createdAt))}</small>
         <p>${esc(item.details || "")}</p>
+        <div class="order-admin-controls">
+          <label>Status order<select class="status-select" data-id="${esc(item.id)}">${["new", "contacted", "paid", "processing", "done", "cancelled"].map(status => `<option value="${status}" ${item.status === status ? "selected" : ""}>${status}</option>`).join("")}</select></label>
+          <label>Status pembayaran<select class="payment-status-select" data-id="${esc(item.id)}">${["awaiting_quote","awaiting_payment","paid","rejected","refunded"].map(status => `<option value="${status}" ${(item.paymentStatus || "awaiting_quote") === status ? "selected" : ""}>${status}</option>`).join("")}</select></label>
+          <label>Total tagihan (Rp)<input class="order-price-input" data-id="${esc(item.id)}" type="number" min="0" step="1000" value="${Number(item.price)||0}"></label>
+          <label class="payment-note-field">Instruksi / catatan pembayaran<input class="payment-note-input" data-id="${esc(item.id)}" maxlength="500" value="${esc(item.paymentNote || "")}" placeholder="Transfer ke ..."></label>
+          <button type="button" class="btn small save-order-payment" data-id="${esc(item.id)}">Simpan pembayaran</button>
+        </div>
       </div>
-      <select class="status-select" data-id="${esc(item.id)}">
-        ${["new", "contacted", "paid", "processing", "done", "cancelled"]
-          .map(status => `
-            <option value="${status}" ${item.status === status ? "selected" : ""}>
-              ${status}
-            </option>
-          `).join("")}
-      </select>
     </div>
   `).join("");
 }
@@ -601,6 +594,20 @@ document.addEventListener("click", async event => {
   }
 });
 
+// SIMPAN NOMINAL DAN INSTRUKSI PEMBAYARAN DIRECT
+ document.addEventListener("click", async event => {
+   const button = event.target.closest(".save-order-payment");
+   if (!button) return;
+   const id = button.dataset.id;
+   const price = Number(document.querySelector(`.order-price-input[data-id="${id}"]`)?.value || 0);
+   const paymentNote = document.querySelector(`.payment-note-input[data-id="${id}"]`)?.value.trim() || "";
+   const paymentStatus = document.querySelector(`.payment-status-select[data-id="${id}"]`)?.value || "awaiting_quote";
+   if (!Number.isFinite(price) || price < 0) { alert("Nominal pembayaran tidak valid."); return; }
+   try { button.disabled = true; await updateDoc(doc(db, "orders", id), { price, paymentNote, paymentStatus, updatedAt: serverTimestamp() }); await loadOrders(); alert("Nominal dan instruksi pembayaran diperbarui."); }
+   catch (error) { alert(showError("Gagal menyimpan pembayaran", error)); }
+   finally { button.disabled = false; }
+ });
+
 // UBAH STATUS ORDER
 
 document.addEventListener("change", async event => {
@@ -638,48 +645,58 @@ $("refreshOrders")?.addEventListener("click", async () => {
   }
 });
 
-// BOOSTING CENTER: navigate directly to package management.
-$("goPackages")?.addEventListener("click", () => {
-  document.querySelector('[data-pane="packagesPane"]')?.click();
-});
 
-// Design range readouts.
-["speed","density"].forEach(name => {
-  const field = $("designForm")?.elements.namedItem(name);
-  const output = $(name === "speed" ? "speedValue" : "densityValue");
-  const update = () => { if (output && field) output.value = field.value; };
-  field?.addEventListener("input", update); update();
-});
-
-// Browser-side website monitor. Reports only what this browser can observe.
-$("runMonitor")?.addEventListener("click", async () => {
-  const button = $("runMonitor");
-  setBusy(button, true);
-  showStatus("monitorMessage", "Memeriksa halaman publik...");
-  const started = performance.now();
-  try {
-    const response = await fetch("./?monitor=" + Date.now(), {cache:"no-store"});
-    const latency = Math.round(performance.now() - started);
-    showStatus("monitorStatus", response.ok ? "ONLINE" : "HTTP " + response.status);
-    showStatus("monitorLatency", latency + " ms");
-    showStatus("monitorOnline", navigator.onLine ? "Online" : "Offline");
-    showStatus("monitorScreen", `${screen.width} × ${screen.height}`);
-    showStatus("monitorMessage", response.ok ? "Halaman berhasil merespons dari browser ini." : "Website merespons dengan status HTTP " + response.status);
-  } catch (error) {
-    showStatus("monitorStatus", "CHECK FAILED");
-    showStatus("monitorLatency", "—");
-    showStatus("monitorOnline", navigator.onLine ? "Online" : "Offline");
-    showStatus("monitorMessage", "Tidak dapat menghubungi halaman publik: " + (error.message || error));
-  } finally { setBusy(button, false); }
-});
-
-// Export orders to a CSV file for local reporting.
-$("exportOrders")?.addEventListener("click", () => {
-  const cols = ["name","phone","email","service","details","status"];
-  const quote = value => '"' + String(value ?? "").replace(/"/g,'""') + '"';
-  const csv = [cols.join(","), ...orders.map(row => cols.map(key => quote(row[key])).join(","))].join("\\n");
-  const blob = new Blob(["\\ufeff" + csv], {type:"text/csv;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a"); link.href=url; link.download="kenseonn-orders.csv"; link.click();
-  URL.revokeObjectURL(url);
-});
+// FINAL ULTIMATE 50: design controls, diagnostics, reports and operational helpers.
+const capabilityNames = [
+"Admin login Firebase","Pemeriksaan UID admin","Dashboard ringkasan","Penghitungan pesanan","Penghitungan layanan","Penghitungan paket","Ringkasan pesanan baru","Ringkasan pesanan selesai","Ringkasan nilai pesanan","Edit profil brand","Edit judul hero","Edit deskripsi hero","Edit email kontak","Edit Instagram","Edit WhatsApp","Maintenance mode","Maintenance countdown","CRUD katalog IT","Aktif/nonaktif layanan","CRUD paket boosting","Edit platform boosting","Edit kuantitas paket","Edit harga paket","Edit garansi paket","Daftar order Firebase","Ubah status order","Pencarian order","Filter status order","Refresh order","Tetapkan nominal tagihan","Ubah status pembayaran","Tulis instruksi pembayaran","Export CSV order","Kode order unik sisi browser","Matrix Rain","Starfield","Snowfall","Cyber particles","Preset tema","Warna aksen","Kontrol kecepatan efek","Kontrol kepadatan efek","Kontrol glow","Toggle scanline","Toggle grid","Toggle motion","Edit monogram","Analytics status","Layanan populer","Rasio penyelesaian","Monitor halaman dari browser","Tes baca Firestore","Backup JSON katalog","Restore konfigurasi situs","Export katalog CSV","Activity log sesi lokal","Layout responsif admin","Dashboard akun pelanggan","Registrasi pelanggan","Login pelanggan","Logout pelanggan","Daftar pesanan milik akun","Refresh riwayat pelanggan","Pemesanan dengan akun","Penyimpanan UID pelanggan","Validasi nomor WhatsApp","Validasi detail pesanan","Persetujuan kepemilikan/izin","Status menunggu penawaran","Status menunggu pembayaran","Status pembayaran lunas","Catatan pembayaran per order","Tagihan per order","Instruksi transfer per order","Katalog layanan IT","Katalog paket sosial","Tautan order dari kartu layanan","Tautan order dari kartu paket","FAQ layanan","Kontak email","Kontak WhatsApp","Kontak Instagram","Halaman maintenance","Pengaturan pembayaran manual","Proteksi data pelanggan per UID","Akses baca order oleh admin","Akses update order oleh admin","Akses CRUD katalog oleh admin","Aturan catch-all deny","Tidak meminta password akun sosial","Peringatan jangan kirim OTP","Peringatan scope security berizin","Riwayat status pesanan","Pencarian nama pelanggan","Pencarian nomor pelanggan","Pencarian kode order","Pencarian detail order","Ekspor data pesanan","Ekspor katalog layanan","Timestamp pembaruan order"
+];
+const capGrid = $("capabilityGrid");
+if (capGrid) capGrid.innerHTML = capabilityNames.map((name,i)=>`<div class="capability-item"><span>${String(i+1).padStart(2,"0")}</span>${esc(name)}</div>`).join("");
+let localActivity=[];
+function logActivity(message){localActivity.unshift({at:new Date().toLocaleString("id-ID"),message});localActivity=localActivity.slice(0,30);const box=$("activityLog");if(box)box.innerHTML=localActivity.map(x=>`<div><small>${esc(x.at)}</small>${esc(x.message)}</div>`).join("")||"<p>Belum ada aktivitas.</p>";}
+function navigatePane(id){document.querySelectorAll(".admin-tab").forEach(t=>t.classList.toggle("active",t.dataset.pane===id));document.querySelectorAll(".admin-pane").forEach(p=>p.classList.toggle("hidden",p.id!==id));}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-jump]");if(b){navigatePane(b.dataset.jump);$(b.dataset.jump)?.scrollIntoView({behavior:"smooth",block:"start"});}});
+function fillDesignForm(data={}){const f=$("designForm");if(!f)return;for(const [k,v] of Object.entries({theme:"matrix",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//",...data})){const el=f.elements.namedItem(k);if(el){if(el.type==="checkbox")el.checked=v===true;else el.value=v??"";}}$("speedOutput").textContent=f.elements.speed.value;$("densityOutput").textContent=f.elements.density.value;}
+const designDefaults={theme:"matrix",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//"};
+const originalRefreshAll=refreshAll;
+// Load saved visual config after the existing site document has been loaded.
+const _refreshAllUltimate=refreshAll;
+// Wrap refresh in a microtask to keep the original Firebase loading path intact.
+setTimeout(async()=>{try{const snap=await getDoc(doc(db,"siteConfig","main"));if(snap.exists())fillDesignForm({...designDefaults,...(snap.data().design||{})});else fillDesignForm();}catch(e){console.warn("Design settings load:",e);fillDesignForm();}},1200);
+$("designForm")?.addEventListener("submit",async e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('[type="submit"]');const d={};for(const key of Object.keys(designDefaults)){const el=f.elements.namedItem(key);d[key]=el?.type==="checkbox"?el.checked:el?.type==="range"?Number(el.value):el?.value;}btn.disabled=true;showStatus("designStatus","Menyimpan desain...");try{await setDoc(doc(db,"siteConfig","main"),{design:d},{merge:true});showStatus("designStatus","Desain tersimpan. Website menerapkan saat dimuat ulang.");logActivity("Memperbarui Design Lab");}catch(err){showStatus("designStatus",showError("Gagal menyimpan desain",err));}finally{btn.disabled=false;}});
+["speed","density"].forEach(k=>$("designForm")?.elements.namedItem(k)?.addEventListener("input",e=>{$(k+"Output").textContent=e.target.value;}));
+$("previewEffect")?.addEventListener("click",()=>{const f=$("designForm"),box=$("effectPreview");box.dataset.effect=f.elements.effect.value;box.style.setProperty("--preview-accent",f.elements.accent.value);box.querySelector("span").textContent=`PREVIEW: ${f.elements.effect.value.toUpperCase()} • SPEED ${f.elements.speed.value}`;logActivity("Menjalankan preview efek lokal");});
+function csvDownload(name,rows){const csv=rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
+function dateValue(v){try{return v?.toDate?v.toDate().toLocaleString("id-ID"):"";}catch{return "";}}
+function renderOrderTools(){
+ const q=($("orderSearch")?.value||"").toLowerCase(),st=$("orderFilter")?.value||"all";
+ const filtered=orders.filter(o=>(st==="all"||o.status===st)&&[o.name,o.phone,o.service,o.orderCode,o.details].some(v=>String(v||"").toLowerCase().includes(q)));
+ const c=$("ordersAdminList");if(!c)return;
+ c.innerHTML=filtered.map(item=>`<div class="order-row order-row-expanded"><div>
+ <b>${esc(item.orderCode||item.id)} · ${esc(item.name||"Tanpa nama")} — ${esc(item.service||"")}</b>
+ <small>${esc(item.phone||"")} ${item.email?"· "+esc(item.email):""} · ${esc(dateValue(item.createdAt))}</small><p>${esc(item.details||"")}</p>
+ <div class="order-admin-controls">
+ <label>Status order<select class="status-select" data-id="${esc(item.id)}">${["new","contacted","paid","processing","done","cancelled"].map(status=>`<option value="${status}" ${item.status===status?"selected":""}>${status}</option>`).join("")}</select></label>
+ <label>Status pembayaran<select class="payment-status-select" data-id="${esc(item.id)}">${["awaiting_quote","awaiting_payment","paid","rejected","refunded"].map(status=>`<option value="${status}" ${(item.paymentStatus||"awaiting_quote")===status?"selected":""}>${status}</option>`).join("")}</select></label>
+ <label>Total tagihan (Rp)<input class="order-price-input" data-id="${esc(item.id)}" type="number" min="0" step="1000" value="${Number(item.price)||0}"></label>
+ <label class="payment-note-field">Instruksi pembayaran<input class="payment-note-input" data-id="${esc(item.id)}" maxlength="500" value="${esc(item.paymentNote||"")}" placeholder="Transfer ke ..."></label>
+ <button type="button" class="btn small save-order-payment" data-id="${esc(item.id)}">Simpan pembayaran</button>
+ </div></div></div>`).join("")||'<p class="muted-note">Tidak ada pesanan yang cocok.</p>';
+}
+$("orderSearch")?.addEventListener("input",renderOrderTools);$("orderFilter")?.addEventListener("change",renderOrderTools);
+$("exportOrders")?.addEventListener("click",()=>{csvDownload("kenseonn-orders.csv",[["Order ID","Kode","Nama","WhatsApp","Email","Layanan","Detail","Status","Dibuat"],...orders.map(o=>[o.id,o.orderCode,o.name,o.phone,o.email,o.service,o.details,o.status,dateValue(o.createdAt)])]);logActivity("Export data pesanan CSV");});
+$("exportCatalog")?.addEventListener("click",()=>{csvDownload("kenseonn-catalog.csv",[["Type","ID","Name/platform","Description/qty","Price","Guarantee","Active"],...services.map(x=>["service",x.id,x.name,x.description,"","",x.active!==false]),...packages.map(x=>["package",x.id,x.platform,x.qty,x.price,x.guarantee,true])]);logActivity("Export katalog CSV");});
+function renderAnalytics(){const total=orders.length,done=orders.filter(o=>o.status==="done").length,active=orders.filter(o=>["new","contacted","paid","processing"].includes(o.status)).length;$("anaTotal").textContent=total;$("anaActive").textContent=active;$("anaDone").textContent=done;$("anaRate").textContent=(total?Math.round(done/total*100):0)+"%";const counts={};orders.forEach(o=>counts[o.status||"unknown"]=(counts[o.status||"unknown"]||0)+1);$("statusBars").innerHTML=Object.entries(counts).map(([k,v])=>`<div class="bar-row"><span>${esc(k)}</span><div><i style="width:${total?v/total*100:0}%"></i></div><b>${v}</b></div>`).join("")||"Belum ada data.";const popular={};orders.forEach(o=>popular[o.service||"Tidak diketahui"]=(popular[o.service||"Tidak diketahui"]||0)+1);$("popularServices").innerHTML=Object.entries(popular).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>`<div class="admin-row"><b>${esc(k)}</b><span>${v} order</span></div>`).join("")||"Belum ada pesanan.";$("statNew").textContent=orders.filter(o=>o.status==="new").length;$("statDone").textContent=done;$("statRevenue").textContent="Rp "+money(orders.filter(o=>["paid","done"].includes(o.status)).reduce((sum,o)=>sum+Number(o.price||0),0));}
+$("refreshAnalytics")?.addEventListener("click",async()=>{try{await loadOrders();renderAnalytics();logActivity("Refresh analytics");}catch(e){alert(showError("Analytics gagal dimuat",e));}});
+$("runMonitor")?.addEventListener("click",async()=>{const out=$("monitorResult");out.textContent="Memeriksa...";const start=performance.now();try{const res=await fetch("./",{cache:"no-store"});out.textContent=`HTTP ${res.status} · ${Math.round(performance.now()-start)} ms`;logActivity("Monitor website dijalankan");}catch(e){out.textContent="Gagal dijangkau dari browser ini";}});
+$("runFirebaseCheck")?.addEventListener("click",async()=>{const out=$("firebaseResult");out.textContent="Memeriksa...";try{await getDoc(doc(db,"siteConfig","main"));out.textContent="Firestore read OK";logActivity("Tes koneksi Firestore berhasil");}catch(e){out.textContent=`Gagal: ${e.code||e.message}`;}});
+$("backupData")?.addEventListener("click",async()=>{try{const [siteSnap,s,p]=await Promise.all([getDoc(doc(db,"siteConfig","main")),getDocs(collection(db,"services")),getDocs(collection(db,"packages"))]);const payload={schema:"kenseonn-backup-v1",createdAt:new Date().toISOString(),site:siteSnap.data()||{},services:s.docs.map(d=>({id:d.id,...d.data()})),packages:p.docs.map(d=>({id:d.id,...d.data()}))};const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));a.download="kenseonn-backup.json";a.click();URL.revokeObjectURL(a.href);logActivity("Backup JSON diunduh");}catch(e){alert(showError("Backup gagal",e));}});
+$("restoreData")?.addEventListener("click",async()=>{const file=$("restoreFile")?.files?.[0];if(!file){alert("Pilih file backup JSON terlebih dahulu.");return;}if(!confirm("Restore akan menggabungkan konfigurasi ke siteConfig/main. Lanjutkan?"))return;try{const data=JSON.parse(await file.text());if(data.schema!=="kenseonn-backup-v1"||!data.site||typeof data.site!=="object")throw new Error("Format backup tidak dikenali");await setDoc(doc(db,"siteConfig","main"),data.site,{merge:true});alert("Konfigurasi berhasil direstore. Layanan dan paket tidak ditimpa otomatis demi keamanan.");logActivity("Restore konfigurasi website");}catch(e){alert(showError("Restore gagal",e));}});
+$("clearActivity")?.addEventListener("click",()=>{localActivity=[];$("activityLog").innerHTML="<p>Log lokal dibersihkan.</p>";});
+// Recompute overview whenever original loaders finish and after status updates.
+const _loadOrdersUltimate=loadOrders;
+loadOrders=async function(){await _loadOrdersUltimate();renderAnalytics();renderOrderTools();};
+const _loadServicesUltimate=loadServices;
+loadServices=async function(){await _loadServicesUltimate();};
+const _loadPackagesUltimate=loadPackages;
+loadPackages=async function(){await _loadPackagesUltimate();};

@@ -1,51 +1,45 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
+    function signedIn() { return request.auth != null; }
     function isAdmin() {
-      return request.auth != null
+      return signedIn()
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
         && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
     }
 
-    match /siteConfig/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /services/{serviceId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /packages/{packageId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
+    match /siteConfig/{docId} { allow read: if true; allow write: if isAdmin(); }
+    match /services/{serviceId} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /packages/{packageId} { allow read: if true; allow create, update, delete: if isAdmin(); }
     match /admins/{uid} {
-      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
       allow write: if false;
     }
-
+    match /customers/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.email == request.auth.token.email;
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','updatedAt']);
+      allow delete: if isAdmin();
+    }
     match /orders/{orderId} {
-      allow create: if
-        request.resource.data.name is string &&
-        request.resource.data.name.size() >= 2 &&
-        request.resource.data.name.size() <= 80 &&
-        request.resource.data.phone is string &&
-        request.resource.data.phone.size() >= 7 &&
-        request.resource.data.phone.size() <= 25 &&
-        request.resource.data.service is string &&
-        request.resource.data.service.size() >= 2 &&
-        request.resource.data.details is string &&
-        request.resource.data.details.size() >= 5 &&
-        request.resource.data.details.size() <= 1500;
-      allow read, update, delete: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
+        && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.service is string && request.resource.data.service.size() >= 2 && request.resource.data.service.size() <= 180
+        && request.resource.data.details is string && request.resource.data.details.size() >= 5 && request.resource.data.details.size() <= 1500
+        && request.resource.data.status == 'new'
+        && request.resource.data.paymentStatus == 'awaiting_quote'
+        && request.resource.data.price == 0;
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
     }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /{document=**} { allow read, write: if false; }
   }
 }

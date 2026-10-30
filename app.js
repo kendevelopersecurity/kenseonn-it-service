@@ -6,27 +6,51 @@ import {
   doc,
   getDoc,
   addDoc,
-  serverTimestamp
+  setDoc,
+  query,
+  serverTimestamp,
+  where
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+let currentCustomer = null;
 
 const fallbackServices = [
-  ["security-assessment", "🛡️", "Cek Keamanan Website", "Audit keamanan website secara berizin."],
-  ["wifi-audit", "📡", "Cek Keamanan WiFi", "Assessment jaringan WiFi milik klien dengan izin."],
-  ["cctv-audit", "📹", "Cek Keamanan CCTV", "Audit konfigurasi dan keamanan CCTV milik klien."],
-  ["mobile-security", "📱", "Mobile Security Testing", "Pengujian keamanan aplikasi secara berizin."],
-  ["wa-security", "💬", "WhatsApp Security", "Bantuan keamanan akun dan pengaturan privasi."],
-  ["link-security", "🔗", "Link Security Assessment", "Pemeriksaan keamanan URL dan domain."],
-  ["social-boost", "📈", "Boosting All Medsos", "Layanan digital marketing."],
-  ["private-training", "🎓", "Private Ethical Hacking", "Belajar keamanan siber secara legal."],
-  ["osint-audit", "🔎", "OSINT & Exposure Check", "Pemeriksaan exposure informasi yang sah."],
-  ["custom-development", "🧩", "Custom Security Tool / Script", "Pembuatan tools untuk kebutuhan defensif."]
-].map(([id, icon, name, description]) => ({
-  id, icon, name, description, active: true
-}));
+  ['security-assessment', '🛡️', 'Audit Keamanan Website', 'Pemeriksaan konfigurasi dan risiko keamanan website milik klien.'],
+  ['wifi-audit', '📡', 'Audit Keamanan WiFi', 'Pemeriksaan keamanan jaringan WiFi dengan izin pemilik.'],
+  ['cctv-audit', '📹', 'Audit CCTV & NVR', 'Review konfigurasi, akses, firmware, dan keamanan perangkat CCTV.'],
+  ['mobile-security', '📱', 'Mobile App Security Review', 'Review keamanan aplikasi Android/iOS dengan izin.'],
+  ['wa-security', '💬', 'Konsultasi Keamanan WhatsApp', 'Panduan privasi, keamanan akun, dan pemulihan akses resmi.'],
+  ['domain-check', '🌐', 'Pemeriksaan Domain & DNS', 'Pemeriksaan DNS, konfigurasi domain, dan keamanan dasar.'],
+  ['ssl-setup', '🔒', 'Instalasi SSL/TLS', 'Konfigurasi sertifikat HTTPS untuk domain yang dikelola klien.'],
+  ['website-maintenance', '🧰', 'Maintenance Website', 'Pembaruan, perbaikan bug, dan pengecekan rutin website.'],
+  ['wordpress-care', '📰', 'WordPress Care', 'Update plugin/tema, hardening dasar, backup, dan troubleshooting.'],
+  ['malware-cleanup', '🧹', 'Pembersihan Malware Website', 'Pemeriksaan dan pembersihan malware pada website milik klien.'],
+  ['backup-restore', '💾', 'Backup & Restore Website', 'Pembuatan backup dan pemulihan file/database.'],
+  ['web-development', '💻', 'Pembuatan Website', 'Landing page, company profile, katalog, atau website custom.'],
+  ['web-redesign', '🎨', 'Redesign UI Website', 'Penyegaran antarmuka, responsif, dan pengalaman pengguna.'],
+  ['hosting-setup', '☁️', 'Setup Hosting & Deployment', 'Konfigurasi hosting, domain, SSL, dan deployment.'],
+  ['email-business', '✉️', 'Setup Email Bisnis', 'Konfigurasi email domain dan DNS email.'],
+  ['database-setup', '🗄️', 'Setup Database', 'Perancangan database dan konfigurasi akses sesuai kebutuhan.'],
+  ['firebase-setup', '🔥', 'Firebase Setup', 'Setup Firebase Auth, Firestore, Hosting, dan security rules.'],
+  ['automation-script', '⚙️', 'Automation Script', 'Script otomasi untuk workflow yang sah dan disetujui.'],
+  ['bot-development', '🤖', 'Bot & Integration Development', 'Bot layanan/integrasi API untuk penggunaan yang sah.'],
+  ['api-integration', '🔌', 'API Integration', 'Integrasi API resmi antar aplikasi dan layanan.'],
+  ['pc-troubleshoot', '🖥️', 'Troubleshooting PC/Laptop', 'Diagnosa software, sistem operasi, dan performa perangkat.'],
+  ['android-support', '📲', 'Android Troubleshooting', 'Bantuan konfigurasi, backup, dan pemecahan masalah Android.'],
+  ['network-setup', '🕸️', 'Setup Jaringan LAN', 'Perencanaan dan konfigurasi jaringan lokal.'],
+  ['osint-audit', '🔎', 'OSINT Exposure Review', 'Pemeriksaan paparan informasi publik secara etis dan sah.'],
+  ['security-training', '🎓', 'Private Cybersecurity Training', 'Pelatihan dasar keamanan siber dan praktik defensif.'],
+  ['custom-development', '🧩', 'Custom Software Development', 'Pembuatan aplikasi atau tools sesuai ruang lingkup proyek.'],
+  ['social-marketing', '📈', 'Social Media Marketing', 'Konsultasi kampanye dan pemasaran media sosial.'],
+  ['content-design', '🖼️', 'Desain Konten Digital', 'Desain aset visual untuk kebutuhan digital.'],
+  ['seo-audit', '📊', 'SEO Basic Audit', 'Audit dasar struktur SEO teknis dan konten website.'],
+  ['consultation', '🧑\u200d💼', 'Konsultasi IT', 'Konsultasi kebutuhan IT, estimasi pekerjaan, dan rekomendasi solusi.']
+].map(([id, icon, name, description]) => ({ id, icon, name, description, active: true }));
 
 const fallbackPackages = [];
 const prices = [80000, 160000, 320000, 400000, 480000, 560000, 640000, 720000, 800000, 880000];
@@ -81,66 +105,6 @@ function showOrderStatus(message, success = false) {
   el.style.color = success ? "#86ffad" : "#ffb4b4";
 }
 
-
-// Appearance/social controls are intentionally browser-local.
-// This avoids adding Firestore collections or changing existing security rules.
-const LOCAL_DESIGN_KEY = "kenseonn.design.v1";
-const LOCAL_SOCIAL_KEY = "kenseonn.social.v1";
-const defaultDesign = {accent:"#7cf29a",accent2:"#63a7ff",bg:"#06080d",panel:"#0c1119",effect:"cyber",animation:"on",intensity:"medium",particles:true};
-const socialLabels = {instagram:"Instagram",tiktok:"TikTok",facebook:"Facebook",youtube:"YouTube",telegram:"Telegram",whatsapp:"WhatsApp",discord:"Discord",github:"GitHub",x:"X / Twitter",linkedin:"LinkedIn"};
-function readLocal(key, fallback){try{return {...fallback,...JSON.parse(localStorage.getItem(key)||"{}")}}catch{return {...fallback}}}
-function safeSocialUrl(value){
-  try{const u=new URL(value);return ["https:","http:"].includes(u.protocol)?u.href:""}catch{return ""}
-}
-let fxFrame = 0;
-function applyLocalDesign(){
-  const d={...defaultDesign,...(site.design||{})}, root=document.documentElement;
-  root.style.setProperty("--accent",d.accent);root.style.setProperty("--accent2",d.accent2);
-  root.style.setProperty("--bg",d.bg);root.style.setProperty("--panel",d.panel);
-  document.body.classList.toggle("animations-off",d.animation==="off");
-  document.body.classList.toggle("hide-grid",d.grid===false);
-  document.body.classList.toggle("hide-scanline",d.scanline===false);
-  document.body.classList.toggle("no-glow",d.glow===false);
-  const logo=document.querySelector(".brand-mark");
-  if(logo && d.logoText){logo.textContent=d.logoText;logo.classList.add("text-logo")}
-  const badge=byId("heroBadgeText");if(badge && d.heroBadge)badge.textContent=d.heroBadge;
-  document.body.classList.remove("fx-neon","fx-matrix","fx-minimal","fx-stars","fx-snow","fx-particles","intensity-low","intensity-high");
-  if(d.effect==="neon")document.body.classList.add("fx-neon");
-  if(d.effect==="matrix")document.body.classList.add("fx-matrix");
-  if(d.effect==="minimal")document.body.classList.add("fx-minimal");
-  if(d.effect==="stars")document.body.classList.add("fx-stars");
-  if(d.effect==="snow")document.body.classList.add("fx-snow");
-  if(d.effect==="particles")document.body.classList.add("fx-particles");
-  document.body.classList.add("intensity-"+(d.intensity||"medium"));
-  startFxCanvas(d);
-}
-function startFxCanvas(d){
-  const canvas=byId("fxCanvas");if(!canvas)return;
-  cancelAnimationFrame(fxFrame);
-  const ctx=canvas.getContext("2d");let w=0,h=0,items=[];
-  const resize=()=>{w=canvas.width=innerWidth*devicePixelRatio;h=canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+"px";canvas.style.height=innerHeight+"px";ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);w=innerWidth;h=innerHeight;};
-  resize();addEventListener("resize",resize,{passive:true});
-  const type=d.effect||"matrix",count=Math.max(10,Math.min(180,Number(d.density)||60)),speed=Math.max(1,Math.min(10,Number(d.speed)||5));
-  const symbols="アイウエオカキクケコサシスセソタチツテト0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  items=Array.from({length:count},()=>({x:Math.random()*w,y:Math.random()*h,v:.3+Math.random()*speed*.45,r:Math.random()*2+0.5,char:symbols[Math.floor(Math.random()*symbols.length)],alpha:.15+Math.random()*.7}));
-  const draw=()=>{
-    if(d.animation==="off"||type==="minimal"||type==="cyber"){ctx.clearRect(0,0,w,h);return;}
-    ctx.clearRect(0,0,w,h);
-    for(const p of items){
-      ctx.globalAlpha=p.alpha;
-      if(type==="matrix"){ctx.fillStyle=d.accent||"#00ff88";ctx.font="14px monospace";ctx.fillText(p.char,p.x,p.y);p.y+=p.v*speed*.7;if(p.y>h+20){p.y=-20;p.x=Math.random()*w}}
-      else {ctx.fillStyle=type==="snow"?"#e8f7ff":(d.accent2||"#9bdcff");ctx.beginPath();ctx.arc(p.x,p.y,p.r*(type==="stars"?1.2:1),0,Math.PI*2);ctx.fill();p.y+=p.v*(type==="snow"?speed*.45:speed*.18);p.x+=Math.sin(p.y*.01)*.35;if(p.y>h+8){p.y=-8;p.x=Math.random()*w}}
-    }
-    ctx.globalAlpha=1;fxFrame=requestAnimationFrame(draw);
-  };
-  if(!matchMedia("(prefers-reduced-motion: reduce)").matches)draw();
-}
-function renderSocialLinks(){
-  const holder=byId("socialLinks");if(!holder)return;
-  const social={instagram:site.instagram?`https://instagram.com/${site.instagram}`:"",whatsapp:site.whatsapp?`https://wa.me/${String(site.whatsapp).replace(/\D/g,"")}`:"",...(site.social||readLocal(LOCAL_SOCIAL_KEY,{}))};
-  holder.innerHTML=Object.entries(socialLabels).map(([key,label])=>{const url=safeSocialUrl(social[key]||"");return url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:""}).join("");
-}
-
 async function loadData() {
   try {
     const [serviceSnap, packageSnap, siteSnap] = await Promise.all([
@@ -173,9 +137,12 @@ async function loadData() {
   }
 
   render();
-  // Apply saved Design Studio and Social Media settings after Firestore data is loaded.
-  applyLocalDesign();
-  renderSocialLinks();
+  applyDesign();
+  const paymentBox = byId("paymentInstructions");
+  if (paymentBox) {
+    const method = [site.paymentMethod, site.paymentRecipient, site.paymentAccount].filter(Boolean).join(" · ");
+    paymentBox.textContent = [method, site.paymentInstructions].filter(Boolean).join(" — ") || "Instruksi pembayaran akan diberikan admin setelah nominal dikonfirmasi.";
+  }
 }
 
 function render() {
@@ -244,7 +211,17 @@ function render() {
     }
   }
 
-  renderPlatformTabs();
+  const platforms = [...new Set(packages.map(p => String(p.platform || "").toLowerCase()))];
+  const tabs = byId("platformTabs");
+  if (tabs) {
+    const labels = {instagram:"Instagram",tiktok:"TikTok",facebook:"Facebook",youtube:"YouTube",telegram:"Telegram",x:"X",threads:"Threads"};
+    tabs.innerHTML = (platforms.length ? platforms : ["instagram","tiktok"]).map((key,i) => `<button class="tab ${i===0?"active":""}" data-platform="${esc(key)}">${esc(labels[key] || key.toUpperCase())}</button>`).join("");
+    tabs.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
+      tabs.querySelectorAll("button").forEach(t => t.classList.toggle("active", t===button));
+      renderPackages(button.dataset.platform);
+    }));
+  }
+  renderPackages(platforms[0] || "instagram");
 }
 
 function renderPackages(platform) {
@@ -343,13 +320,6 @@ function startCountdown(until) {
   countdownTimer = setInterval(tick, 1000);
 }
 
-document.querySelectorAll(".tab").forEach(button => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
-    button.classList.add("active");
-    renderPackages(button.dataset.platform);
-  });
-});
 
 document.addEventListener("click", event => {
   const button = event.target.closest(".order-service, .order-package");
@@ -373,68 +343,102 @@ document.addEventListener("click", event => {
   form.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
-const orderForm = byId("orderForm");
+const authGuest = byId("authGuest");
+const customerDashboard = byId("customerDashboard");
+const setText = (id, value) => { const el = byId(id); if (el) el.textContent = value ?? ""; };
 
-if (orderForm) {
-  orderForm.addEventListener("submit", async event => {
-    event.preventDefault();
-
-    const form = event.currentTarget;
-    const submitButton = form.querySelector('[type="submit"]');
-
-    if (!form.reportValidity()) return;
-
-    const fields = new FormData(form);
-
-    const name = String(fields.get("name") || "").trim();
-    const phone = String(fields.get("phone") || "").trim();
-    const email = String(fields.get("email") || "").trim();
-    const service = String(fields.get("service") || "").trim();
-    const details = String(fields.get("details") || "").trim();
-
-    if (!name || !phone || !service || !details) {
-      showOrderStatus("Lengkapi nama, WhatsApp, layanan, dan detail kebutuhan.");
-      return;
-    }
-
-    const consent = form.querySelector('[type="checkbox"]');
-    if (consent && !consent.checked) {
-      showOrderStatus("Centang persetujuan izin sebelum mengirim order.");
-      return;
-    }
-
-    const data = {
-      name,
-      phone,
-      email,
-      service,
-      details,
-      status: "new",
-      createdAt: serverTimestamp()
-    };
-
-    try {
-      showOrderStatus("Mengirim order…");
-      if (submitButton) submitButton.disabled = true;
-
-      await addDoc(collection(db, "orders"), data);
-
-      showOrderStatus(
-        "Order berhasil dikirim. Admin akan menghubungi Anda.",
-        true
-      );
-      form.reset();
-    } catch (err) {
-      console.error("Gagal mengirim order:", err);
-
-      const code = err?.code || "unknown";
-      showOrderStatus(`Order gagal (${code}). Periksa Firebase Rules dan konfigurasi.`);
-    } finally {
-      if (submitButton) submitButton.disabled = false;
-    }
-  });
+async function refreshCustomerOrders() {
+  if (!currentCustomer) return;
+  const target = byId("customerOrders");
+  if (!target) return;
+  target.innerHTML = '<p class="muted-note">Memuat pesanan...</p>';
+  try {
+    const snap = await getDocs(query(collection(db, "orders"), where("uid", "==", currentCustomer.uid)));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    target.innerHTML = items.map(o => `<article class="customer-order-card"><div class="order-card-head"><b>${esc(o.orderCode || o.id)}</b><span class="status-chip">${esc(o.status || "new")}</span></div><h4>${esc(o.service || "Layanan")}</h4><p>${esc(o.details || "")}</p><div class="order-meta"><span>Pembayaran: <b>${esc(o.paymentStatus || "awaiting_quote")}</b></span><span>Tagihan: <b>Rp ${money(o.price || 0)}</b></span></div>${o.paymentNote ? `<p class="payment-note">${esc(o.paymentNote)}</p>` : ""}<small>Dibuat: ${esc(o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString("id-ID") : "Baru saja")}</small></article>`).join("") || '<p class="muted-note">Belum ada pesanan. Pilih layanan untuk memulai.</p>';
+  } catch (err) { target.innerHTML = `<p class="form-status">Gagal memuat pesanan: ${esc(err.code || err.message)}</p>`; }
 }
+
+onAuthStateChanged(auth, async user => {
+  currentCustomer = user;
+  if (authGuest) authGuest.classList.toggle("hidden", !!user);
+  if (customerDashboard) customerDashboard.classList.toggle("hidden", !user);
+  if (!user) return;
+  setText("customerName", user.displayName || "Pelanggan Kenseonn");
+  setText("customerEmail", user.email || "");
+  const emailField = document.querySelector('#orderForm [name="email"]');
+  if (emailField) emailField.value = user.email || "";
+  const nameField = document.querySelector('#orderForm [name="name"]');
+  if (nameField && user.displayName) nameField.value = user.displayName;
+  await refreshCustomerOrders();
+});
+
+byId("registerForm")?.addEventListener("submit", async event => {
+  event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); const button = form.querySelector("button");
+  try { button.disabled = true; setText("registerStatus", "Membuat akun..."); const credential = await createUserWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password"))); await updateProfile(credential.user, { displayName: String(data.get("name")).trim() }); await setDoc(doc(db, "customers", credential.user.uid), { name: String(data.get("name")).trim(), email: credential.user.email, createdAt: serverTimestamp() }, { merge: true }); form.reset(); setText("registerStatus", "Akun berhasil dibuat. Dashboard siap digunakan."); }
+  catch(err) { setText("registerStatus", `Pendaftaran gagal: ${err.code || err.message}`); } finally { button.disabled = false; }
+});
+
+byId("customerLoginForm")?.addEventListener("submit", async event => {
+  event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); const button = form.querySelector("button");
+  try { button.disabled = true; setText("customerLoginStatus", "Memproses login..."); await signInWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password"))); form.reset(); setText("customerLoginStatus", "Login berhasil."); }
+  catch(err) { setText("customerLoginStatus", `Login gagal: ${err.code || err.message}`); } finally { button.disabled = false; }
+});
+byId("customerLogout")?.addEventListener("click", () => signOut(auth));
+byId("refreshCustomerOrders")?.addEventListener("click", refreshCustomerOrders);
+
+const orderForm = byId("orderForm");
+if (orderForm) orderForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const form = event.currentTarget, submitButton = form.querySelector('[type="submit"]');
+  if (!currentCustomer) { showOrderStatus("Silakan daftar atau masuk melalui Customer Dashboard sebelum membuat pesanan."); byId("account")?.scrollIntoView({behavior:"smooth"}); return; }
+  if (!form.reportValidity()) return;
+  const fields = new FormData(form);
+  const name = String(fields.get("name") || currentCustomer.displayName || "Pelanggan").trim();
+  const phone = String(fields.get("phone") || "").trim();
+  const email = currentCustomer.email || "";
+  const service = String(fields.get("service") || "").trim();
+  const details = String(fields.get("details") || "").trim();
+  const consent = form.querySelector('[type="checkbox"]');
+  if (!name || phone.length < 7 || !service || details.length < 5) { showOrderStatus("Periksa nama, nomor WhatsApp, layanan, dan detail pesanan."); return; }
+  if (consent && !consent.checked) { showOrderStatus("Centang persetujuan sebelum mengirim pesanan."); return; }
+  const data = { uid: currentCustomer.uid, name, phone, email, service, details, status:"new", paymentStatus:"awaiting_quote", price:0, paymentNote:"Menunggu admin mengonfirmasi total tagihan dan instruksi pembayaran.", orderCode:`KN-${Date.now().toString(36).toUpperCase()}`, source:"customer-dashboard", createdAt:serverTimestamp() };
+  try { showOrderStatus("Mengirim pesanan..."); submitButton.disabled = true; await addDoc(collection(db,"orders"), data); showOrderStatus("Pesanan berhasil dikirim. Pantau status dan tagihan di Customer Dashboard.", true); form.reset(); const emailField=form.querySelector('[name="email"]'); if(emailField) emailField.value=currentCustomer.email||""; await refreshCustomerOrders(); byId("account")?.scrollIntoView({behavior:"smooth"}); }
+  catch(err) { console.error(err); showOrderStatus(`Pesanan gagal (${err.code || "unknown"}). Pastikan Firebase Rules versi terbaru sudah dipasang.`); }
+  finally { submitButton.disabled = false; }
+});
 
 loadData();
 
-window.addEventListener("storage", event => { if([LOCAL_DESIGN_KEY,LOCAL_SOCIAL_KEY].includes(event.key)){applyLocalDesign();renderSocialLinks();} });
+
+// VISUAL ENGINE: matrix rain, starfield, snowfall and particles (reduced-motion aware).
+function applyDesign() {
+  const d = site.design || {};
+  const themes = {matrix:["#79f2a0","#58d9ff","#070b10"],aurora:["#8be7ff","#b9a4ff","#07101a"],violet:["#c69aff","#64dcff","#0c0715"],ember:["#ff9a67","#ffd36e","#100a08"],mono:["#d5e0eb","#91a2b5","#080b0f"]};
+  const palette = themes[d.theme] || themes.matrix;
+  const accent = d.accent || palette[0], accent2 = d.accent2 || palette[1];
+  document.documentElement.style.setProperty("--accent", accent);
+  document.documentElement.style.setProperty("--accent2", accent2);
+  document.documentElement.style.setProperty("--bg", palette[2]);
+  document.body.classList.toggle("no-motion", d.motion === false);
+  document.body.classList.toggle("no-scanline", d.scanline === false);
+  document.body.classList.toggle("no-grid", d.grid === false);
+  document.documentElement.style.setProperty("--glow-strength", d.glow === "high" ? ".34" : d.glow === "low" ? ".06" : ".18");
+  const mark = document.querySelector(".brand-mark"); if (mark && d.logoText) mark.textContent = d.logoText;
+  startVisualEffect(d);
+}
+let fxFrame = 0;
+function startVisualEffect(settings={}) {
+  const canvas = byId("fxCanvas"); if (!canvas) return;
+  const ctx = canvas.getContext("2d"); if (!ctx) return;
+  cancelAnimationFrame(fxFrame);
+  const effect = settings.effect || "matrix", speed = Math.max(1,Math.min(10,Number(settings.speed)||5));
+  const density = Math.max(10,Math.min(150,Number(settings.density)||55));
+  const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (settings.motion === false || reduced || effect === "none") { ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+  let w=0,h=0,items=[];
+  const resize=()=>{w=canvas.width=window.innerWidth*devicePixelRatio;h=canvas.height=window.innerHeight*devicePixelRatio;canvas.style.width="100%";canvas.style.height="100%";items=Array.from({length:density},()=>({x:Math.random()*w,y:Math.random()*h,z:.3+Math.random()*1.4,v:(.4+Math.random()*1.4)*speed*.22,r:Math.random()*2+0.5}));};
+  resize(); window.addEventListener("resize",resize,{passive:true});
+  const tick=()=>{ctx.clearRect(0,0,w,h);const accent=settings.accent||"#79f2a0";items.forEach((p,i)=>{p.y+=p.v*(effect==="snow"?1.1:1);p.x+=effect==="snow"?Math.sin((p.y+i)*.006)*.35:effect==="particles"?Math.cos((p.y+i)*.01)*.3:0;if(p.y>h+8){p.y=-8;p.x=Math.random()*w;}if(effect==="matrix"){ctx.fillStyle=accent;ctx.globalAlpha=.16+p.z*.28;ctx.font=`${12*p.z*devicePixelRatio}px monospace`;ctx.fillText(Math.random()>.5?"1":"0",p.x,p.y);}else{ctx.globalAlpha=.15+p.z*.38;ctx.fillStyle=effect==="snow"?"#dff5ff":effect==="stars"?"#d7eaff":accent;ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.z*devicePixelRatio,0,Math.PI*2);ctx.fill();}});ctx.globalAlpha=1;fxFrame=requestAnimationFrame(tick);};
+  tick();
+}
