@@ -144,6 +144,9 @@ async function loadData() {
   }
 
   render();
+  // Apply saved Design Studio and Social Media settings after Firestore data is loaded.
+  applyLocalDesign();
+  renderSocialLinks();
 }
 
 function render() {

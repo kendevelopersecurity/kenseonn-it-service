@@ -142,6 +142,12 @@ onAuthStateChanged(auth, async user => {
     $("dashboard")?.classList.remove("hidden");
 
     await refreshAll();
+
+    // Populate Design Studio and Social Media forms from the existing siteConfig/main document.
+    const siteConfigSnap = await getDoc(doc(db, "siteConfig", "main"));
+    const savedSiteConfig = siteConfigSnap.exists() ? siteConfigSnap.data() : {};
+    fillLocalForm($("designForm"), { ...designDefaults, ...(savedSiteConfig.design || {}) });
+    fillLocalForm($("socialForm"), { ...socialDefaults, ...(savedSiteConfig.social || {}) });
   } catch (error) {
     showStatus("loginStatus", showError("Gagal memuat admin panel", error));
     $("dashboard")?.classList.add("hidden");

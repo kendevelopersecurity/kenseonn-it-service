@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin — Kenseonn IT Service</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=ultimate2">
 </head>
 <body class="admin-body">
   <div class="bg-grid"></div>
@@ -116,6 +116,17 @@
       </div>
     </section>
   </main>
-  <script type="module" src="admin.js"></script>
+  <script type="module" src="admin.js?v=ultimate2"></script>
+  <script>
+    // Fallback navigation: keeps admin tabs usable even if Firebase module loading is delayed.
+    document.querySelectorAll('.admin-tab').forEach(function (button) {
+      button.addEventListener('click', function () {
+        document.querySelectorAll('.admin-tab').forEach(function (tab) { tab.classList.toggle('active', tab === button); });
+        document.querySelectorAll('.admin-pane').forEach(function (pane) { pane.classList.add('hidden'); });
+        var pane = document.getElementById(button.dataset.pane);
+        if (pane) pane.classList.remove('hidden');
+      });
+    });
+  </script>
 </body>
 </html>
