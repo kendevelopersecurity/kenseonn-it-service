@@ -50,6 +50,14 @@ service cloud.firestore {
       allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
       allow update, delete: if isAdmin();
     }
+    // Admin-only operational registers added by Ultimate Operations v1.
+    match /{moduleCollection}/{recordId} {
+      allow read, create, update, delete: if isAdmin() && moduleCollection in [
+        'adminRoles', 'fraudCases', 'orderTracking', 'complaints', 'financeEntries',
+        'suppliers', 'announcements', 'deviceSessions', 'globalTasks',
+        'automationJobs', 'webhookConfigs', 'privacyRequests'
+      ];
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }

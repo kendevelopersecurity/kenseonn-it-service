@@ -26,3 +26,7 @@
 /* Diagnostics output */
 .diagnostics-list{display:grid;gap:8px;margin-top:12px}.diagnostic-row{padding:10px 12px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:10px;background:rgba(255,255,255,.025)}.diagnostic-row b,.diagnostic-row small{display:block}.diagnostic-row small{margin-top:4px;opacity:.75;overflow-wrap:anywhere}
 
+/* Ultimate operations module */
+#ultimateRecords .ultimate-record{padding:14px;margin:10px 0;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:14px;background:rgba(255,255,255,.025)}
+#ultimateRecords .ultimate-record h4{margin:0 0 6px}#ultimateRecords .ultimate-record p{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0}
+#ultimateRecords .ultimate-meta{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted,#9ba8b7);font-size:.85rem}

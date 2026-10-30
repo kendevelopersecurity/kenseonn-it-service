@@ -814,3 +814,63 @@ $("designForm")?.elements.namedItem("theme")?.addEventListener("change",e=>{
  $("previewEffect")?.click();
 });
 refreshAll=async function(){await _refreshAllUltimate();try{await loadFeatureManager();}catch(e){console.warn("Feature Manager load:",e);}}
+
+// Ultimate Operations v1: Firestore-backed operational registers.
+const ultimateModules = {
+  adminRoles: 'Role Management (catatan role)', fraudCases: 'Fraud Detection (review manual)',
+  orderTracking: 'Order Tracking', complaints: 'Refund & Complaints', financeEntries: 'Finance & Expenses',
+  suppliers: 'Supplier Management', announcements: 'Member Announcements', deviceSessions: 'Device Session Registry',
+  globalTasks: 'Global Search / Follow-up', automationJobs: 'Scheduled Automation',
+  webhookConfigs: 'API & Webhooks', privacyRequests: 'Privacy & Data Protection'
+};
+function renderUltimateRecords(rows) {
+  const host = $('ultimateRecords');
+  if (!host) return;
+  if (!rows.length) { host.innerHTML = '<p>Belum ada catatan pada modul ini.</p>'; return; }
+  host.innerHTML = rows.map(row => `<article class="ultimate-record"><h4>${esc(row.title || 'Tanpa judul')}</h4><div class="ultimate-meta"><span>Status: ${esc(row.status || 'open')}</span>${row.amount ? `<span>Nominal: Rp ${money(row.amount)}</span>` : ''}<span>${esc(dateValue(row.createdAt) || 'Baru dibuat')}</span></div><p>${esc(row.details || '')}</p><small>ID: ${esc(row.id)}</small></article>`).join('');
+}
+async function loadUltimateRecords() {
+  const module = $('ultimateModule')?.value;
+  if (!module || !ultimateModules[module]) return;
+  $('ultimateListTitle').textContent = ultimateModules[module];
+  $('ultimateRecords').textContent = 'Memuat data...';
+  try {
+    const snap = await getDocs(collection(db, module));
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    rows.sort((a,b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    renderUltimateRecords(rows);
+  } catch (error) {
+    $('ultimateRecords').textContent = showError('Gagal membaca modul', error);
+  }
+}
+$('ultimateModule')?.addEventListener('change', loadUltimateRecords);
+$('refreshUltimate')?.addEventListener('click', loadUltimateRecords);
+$('ultimateForm')?.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!auth.currentUser) { showStatus('ultimateStatus', 'Sesi admin tidak ditemukan. Login ulang.'); return; }
+  const form = event.currentTarget;
+  const button = form.querySelector('[type="submit"]');
+  const module = form.elements.namedItem('module').value;
+  const title = form.elements.namedItem('title').value.trim();
+  const details = form.elements.namedItem('details').value.trim();
+  const amountRaw = form.elements.namedItem('amount').value;
+  if (!ultimateModules[module] || !title || !details) return;
+  setBusy(button, true); showStatus('ultimateStatus', 'Menyimpan ke Firestore...');
+  try {
+    await addDoc(collection(db, module), {
+      title: title.slice(0,120), details: details.slice(0,3000),
+      status: form.elements.namedItem('status').value,
+      amount: amountRaw === '' ? 0 : Math.max(0, Number(amountRaw) || 0),
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      createdBy: auth.currentUser.uid, createdByEmail: auth.currentUser.email || ''
+    });
+    form.elements.namedItem('title').value = '';
+    form.elements.namedItem('details').value = '';
+    form.elements.namedItem('amount').value = '';
+    showStatus('ultimateStatus', 'Catatan berhasil disimpan.');
+    logActivity(`Membuat catatan ${ultimateModules[module]}`);
+    await loadUltimateRecords();
+  } catch (error) {
+    showStatus('ultimateStatus', showError('Gagal menyimpan modul', error));
+  } finally { setBusy(button, false); }
+});
