@@ -9,7 +9,7 @@
   <div class="bg-grid"></div>
   <main class="admin-wrap">
     <section id="loginView" class="auth-card">
-      <div class="brand"><span class="brand-mark">K</span>KENSEONN ADMIN</div>
+      <div class="brand"><span class="brand-mark brand-emblem"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 3 56 17v30L32 61 8 47V17Z" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M20 43V21h6v9l12-9h8L31 33l15 10h-9l-11-8v8Z" fill="currentColor"/><circle cx="48" cy="16" r="4" fill="#79f2a0"/></svg></span><span>KENSEONN <small>COMMAND CENTER</small></span></div>
       <h1>Admin Login</h1>
       <p>Kelola profil, layanan, paket dan order dari Firebase.</p>
       <form id="loginForm">
@@ -24,7 +24,7 @@
     <section id="dashboard" class="dashboard hidden">
       <header class="admin-header"><div><span class="kicker">CONTROL PANEL</span><h1>Kenseonn Admin</h1></div><button id="logoutBtn" class="btn ghost">Logout</button></header>
       <div class="admin-tabs">
-        <button class="admin-tab active" data-pane="overviewPane">⌂ Overview</button><button class="admin-tab" data-pane="sitePane">Website</button><button class="admin-tab" data-pane="servicesPane">Layanan</button><button class="admin-tab" data-pane="packagesPane">Boosting & Harga</button><button class="admin-tab" data-pane="ordersPane">Pesanan</button><button class="admin-tab" data-pane="designPane">Design Lab</button><button class="admin-tab" data-pane="analyticsPane">Analytics</button><button class="admin-tab" data-pane="systemPane">System Tools</button>
+        <button class="admin-tab active" data-pane="overviewPane">⌂ Overview</button><button class="admin-tab" data-pane="sitePane">Website</button><button class="admin-tab" data-pane="servicesPane">Layanan</button><button class="admin-tab" data-pane="packagesPane">Boosting & Harga</button><button class="admin-tab" data-pane="ordersPane">Pesanan</button><button class="admin-tab" data-pane="customersPane">Pelanggan</button><button class="admin-tab" data-pane="designPane">Design Lab</button><button class="admin-tab" data-pane="analyticsPane">Analytics</button><button class="admin-tab" data-pane="systemPane">System Tools</button>
       </div>
 
       <div id="overviewPane" class="admin-pane">
@@ -40,6 +40,7 @@
           <label class="wide">Bio<textarea name="aboutBio"></textarea></label><label>Email<input name="email"></label>
           <label>Instagram username<input name="instagram"></label><label>WhatsApp number<input name="whatsapp"></label>
           <label>Experience text<input name="experience"></label>
+          <div class="wide maintenance-admin"><h3>Registrasi Pelanggan</h3><label class="toggle-line"><input type="checkbox" name="registrationEnabled" checked> Izinkan pelanggan membuat akun baru</label><small>Jika dimatikan, formulir daftar disembunyikan. Akun yang sudah ada tetap dapat login.</small></div>
           <div class="wide maintenance-admin"><h3>Direct Payment Settings</h3><div class="form-grid"><label>Metode pembayaran<input name="paymentMethod" placeholder="Transfer bank / QRIS"></label><label>Nama penerima<input name="paymentRecipient" placeholder="Nama pemilik rekening"></label><label class="wide">Nomor rekening / detail QRIS<input name="paymentAccount" placeholder="Nomor rekening atau keterangan QRIS"></label><label class="wide">Instruksi pembayaran<textarea name="paymentInstructions" placeholder="Admin menetapkan nominal sebelum pelanggan transfer."></textarea></label></div><small>Ini hanya instruksi pembayaran manual. Tidak ada payment gateway atau verifikasi transfer otomatis.</small></div>
           <div class="wide maintenance-admin">
             <h3>Maintenance Mode</h3>
@@ -65,14 +66,19 @@
 
       <div id="packagesPane" class="admin-pane hidden">
         <div class="admin-card"><h2>Tambah / Edit Paket</h2><form id="packageForm" class="form-grid">
-          <input type="hidden" name="id"><label>Platform<select name="platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="facebook">Facebook</option><option value="youtube">YouTube</option><option value="telegram">Telegram</option><option value="x">X</option><option value="threads">Threads</option></select></label>
-          <label>Qty<input required name="qty" placeholder="1K"></label><label>Harga (rupiah)<input required type="number" name="price"></label><label>Garansi<input required name="guarantee" placeholder="7 hari"></label>
+          <input type="hidden" name="id"><label>Platform<select name="platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="facebook">Facebook</option><option value="youtube">YouTube</option><option value="telegram">Telegram</option><option value="x">X</option><option value="threads">Threads</option><option value="whatsapp">WhatsApp</option><option value="linkedin">LinkedIn</option><option value="spotify">Spotify</option><option value="twitch">Twitch</option><option value="snapchat">Snapchat</option><option value="pinterest">Pinterest</option><option value="reddit">Reddit</option><option value="discord">Discord</option><option value="soundcloud">SoundCloud</option><option value="kick">Kick</option><option value="medium">Medium</option><option value="quora">Quora</option></select></label>
+          <label>Jenis layanan<select name="type"><option>Followers</option><option>Views</option><option>Likes</option><option>Comments</option><option>Shares</option><option>Subscribers</option><option>Members</option></select></label><label>Qty<input required name="qty" placeholder="1K"></label><label>Harga (rupiah)<input required type="number" name="price"></label><label>Garansi<input required name="guarantee" placeholder="7 hari"></label>
           <div><button class="btn primary">Simpan</button><button type="button" id="packageCancel" class="btn ghost">Reset</button></div>
         </form></div><div id="packagesAdminList" class="admin-list"></div>
       </div>
 
       <div id="ordersPane" class="admin-pane hidden">
-        <div class="admin-card"><div class="list-head"><h2>Order Masuk</h2><div class="action-row"><button id="exportOrders" class="btn ghost">Export CSV</button><button id="refreshOrders" class="btn ghost">Refresh</button></div></div><div class="filter-row"><input id="orderSearch" placeholder="Cari nama, nomor, layanan, kode order..."><select id="orderFilter"><option value="all">Semua status</option><option>new</option><option>contacted</option><option>paid</option><option>processing</option><option>done</option><option>cancelled</option></select></div><div id="ordersAdminList" class="orders-list"></div></div>
+        <div class="admin-card"><div class="list-head"><h2>Order Masuk</h2><div class="action-row"><button id="exportOrders" class="btn ghost">Export CSV</button><button id="refreshOrders" class="btn ghost">Refresh</button></div></div><div class="filter-row"><input id="orderSearch" placeholder="Cari nama, nomor, layanan, kode order..."><label class="toggle-line"><input type="checkbox" id="showArchivedOrders"> Tampilkan arsip</label><select id="orderFilter"><option value="all">Semua status</option><option>new</option><option>contacted</option><option>paid</option><option>processing</option><option>done</option><option>cancelled</option></select></div><div id="ordersAdminList" class="orders-list"></div></div>
+      </div>
+
+
+      <div id="customersPane" class="admin-pane hidden">
+        <div class="admin-card"><div class="list-head"><div><span class="kicker">CUSTOMER DIRECTORY</span><h2>Data Pelanggan</h2></div><span class="live-pill"><b id="statCustomers">0</b> akun</span></div><input id="customerSearch" placeholder="Cari nama, email, atau UID pelanggan"><div id="customersAdminList" class="admin-list"></div><p class="muted-note">Data hanya untuk kebutuhan layanan. Jangan membagikan UID atau email pelanggan kepada pihak lain.</p></div>
       </div>
 
       <div id="designPane" class="admin-pane hidden">

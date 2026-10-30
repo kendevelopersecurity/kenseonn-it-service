@@ -11,13 +11,15 @@ import {
   serverTimestamp,
   where
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 let currentCustomer = null;
+let registrationEnabled = true;
+const loginCooldownKey = "kenseonn_customer_login_until";
 
 const fallbackServices = [
   ['security-assessment', '🛡️', 'Audit Keamanan Website', 'Pemeriksaan konfigurasi dan risiko keamanan website milik klien.'],
@@ -52,21 +54,8 @@ const fallbackServices = [
   ['consultation', '🧑\u200d💼', 'Konsultasi IT', 'Konsultasi kebutuhan IT, estimasi pekerjaan, dan rekomendasi solusi.']
 ].map(([id, icon, name, description]) => ({ id, icon, name, description, active: true }));
 
+// Paket dan harga tidak dibuat otomatis. Admin wajib memasukkan harga yang benar.
 const fallbackPackages = [];
-const prices = [80000, 160000, 320000, 400000, 480000, 560000, 640000, 720000, 800000, 880000];
-const quantities = ["1K", "2K", "3K", "4K", "5K", "6K", "7K", "8K", "9K", "10K"];
-
-quantities.forEach((qty, i) => {
-  ["instagram", "tiktok"].forEach(platform => {
-    fallbackPackages.push({
-      id: `${platform}-${qty}`,
-      platform,
-      qty,
-      price: prices[i],
-      guarantee: i === 9 ? "30 hari" : "7 hari"
-    });
-  });
-});
 
 const fallbackSite = {
   brandName: "KENSEONN",
@@ -129,6 +118,7 @@ async function loadData() {
     if (siteSnap.exists()) {
       site = { ...fallbackSite, ...siteSnap.data() };
     }
+    registrationEnabled = site.registrationEnabled !== false;
   } catch (err) {
     console.error("Gagal memuat data website:", err);
     showOrderStatus(
@@ -147,6 +137,10 @@ async function loadData() {
 
 function render() {
   applyMaintenance();
+  const registerForm = byId("registerForm");
+  const registerNotice = byId("registrationDisabledNotice");
+  if (registerForm) registerForm.classList.toggle("hidden", !registrationEnabled);
+  if (registerNotice) registerNotice.classList.toggle("hidden", registrationEnabled);
 
   document.title = `${site.brandName || "KENSEONN"} — Digital IT Service`;
 
@@ -211,11 +205,12 @@ function render() {
     }
   }
 
-  const platforms = [...new Set(packages.map(p => String(p.platform || "").toLowerCase()))];
+  const platformOrder = ["instagram","tiktok","facebook","youtube","telegram","x","threads","whatsapp","linkedin","spotify","twitch","snapchat","pinterest","reddit","discord","soundcloud","kick","medium","quora"];
+  const platforms = [...new Set([...platformOrder, ...packages.map(p => String(p.platform || "").toLowerCase())])];
   const tabs = byId("platformTabs");
   if (tabs) {
-    const labels = {instagram:"Instagram",tiktok:"TikTok",facebook:"Facebook",youtube:"YouTube",telegram:"Telegram",x:"X",threads:"Threads"};
-    tabs.innerHTML = (platforms.length ? platforms : ["instagram","tiktok"]).map((key,i) => `<button class="tab ${i===0?"active":""}" data-platform="${esc(key)}">${esc(labels[key] || key.toUpperCase())}</button>`).join("");
+    const labels = {instagram:"Instagram",tiktok:"TikTok",facebook:"Facebook",youtube:"YouTube",telegram:"Telegram",x:"X",threads:"Threads",whatsapp:"WhatsApp",linkedin:"LinkedIn",spotify:"Spotify",twitch:"Twitch",snapchat:"Snapchat",pinterest:"Pinterest",reddit:"Reddit",discord:"Discord",soundcloud:"SoundCloud",kick:"Kick",medium:"Medium",quora:"Quora"};
+    tabs.innerHTML = platforms.map((key,i) => `<button class="tab ${i===0?"active":""}" data-platform="${esc(key)}">${esc(labels[key] || key.toUpperCase())}</button>`).join("");
     tabs.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
       tabs.querySelectorAll("button").forEach(t => t.classList.toggle("active", t===button));
       renderPackages(button.dataset.platform);
@@ -232,19 +227,19 @@ function renderPackages(platform) {
     .filter(p => p.platform === platform)
     .sort((a, b) => (parseInt(a.qty, 10) || 0) - (parseInt(b.qty, 10) || 0));
 
-  grid.innerHTML = list.map(p => `
+  grid.innerHTML = list.length ? list.map(p => `
     <article class="price-card ${p.qty === "10K" ? "featured" : ""}">
       ${p.qty === "10K" ? '<span class="popular">BEST VALUE</span>' : ""}
       <span class="price-platform">${esc(platform.toUpperCase())}</span>
-      <h3>${esc(p.qty)} Followers</h3>
+      <h3>${esc(p.qty)} ${esc(p.type || "Followers")}</h3>
       <div class="price">Rp ${money(p.price)}</div>
       <div class="guarantee">Garansi ${esc(p.guarantee || "sesuai kesepakatan")}</div>
       <button type="button" class="btn primary full order-package"
-        data-service="${esc(`${platform} ${p.qty} Followers — Rp ${p.price}`)}">
+        data-service="${esc(`${platform} ${p.qty} ${p.type || "Followers"} — Rp ${p.price}`)}">
         Order Paket
       </button>
     </article>
-  `).join("");
+  `).join("") : '<p class="muted-note">Paket untuk platform ini belum tersedia. Silakan ajukan permintaan melalui formulir order; admin akan mengonfirmasi ketersediaan dan harga.</p>';
 }
 
 function applyMaintenance() {
@@ -355,7 +350,7 @@ async function refreshCustomerOrders() {
   try {
     const snap = await getDocs(query(collection(db, "orders"), where("uid", "==", currentCustomer.uid)));
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-    target.innerHTML = items.map(o => `<article class="customer-order-card"><div class="order-card-head"><b>${esc(o.orderCode || o.id)}</b><span class="status-chip">${esc(o.status || "new")}</span></div><h4>${esc(o.service || "Layanan")}</h4><p>${esc(o.details || "")}</p><div class="order-meta"><span>Pembayaran: <b>${esc(o.paymentStatus || "awaiting_quote")}</b></span><span>Tagihan: <b>Rp ${money(o.price || 0)}</b></span></div>${o.paymentNote ? `<p class="payment-note">${esc(o.paymentNote)}</p>` : ""}<small>Dibuat: ${esc(o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString("id-ID") : "Baru saja")}</small></article>`).join("") || '<p class="muted-note">Belum ada pesanan. Pilih layanan untuk memulai.</p>';
+    target.innerHTML = items.filter(o => !o.archived).map(o => { const stages = ["new","contacted","paid","processing","done"]; const current = stages.indexOf(o.status); return `<article class="customer-order-card"><div class="order-card-head"><b>${esc(o.orderCode || o.id)}</b><span class="status-chip">${esc(o.status || "new")}</span></div><h4>${esc(o.service || "Layanan")}</h4><p>${esc(o.details || "")}</p><div class="order-timeline">${stages.map((st,i)=>`<span class="${current >= i ? "reached" : ""}">${st}</span>`).join("")}</div><div class="order-meta"><span>Pembayaran: <b>${esc(o.paymentStatus || "awaiting_quote")}</b></span><span>Tagihan: <b>Rp ${money(o.price || 0)}</b></span></div>${o.paymentNote ? `<p class="payment-note">${esc(o.paymentNote)}</p>` : ""}<div class="order-actions"><button type="button" class="btn ghost copy-order-code" data-code="${esc(o.orderCode || o.id)}">Salin kode order</button></div><small>Dibuat: ${esc(o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString("id-ID") : "Baru saja")}</small></article>`; }).join("") || '<p class="muted-note">Belum ada pesanan. Pilih layanan untuk memulai.</p>';
   } catch (err) { target.innerHTML = `<p class="form-status">Gagal memuat pesanan: ${esc(err.code || err.message)}</p>`; }
 }
 
@@ -374,18 +369,37 @@ onAuthStateChanged(auth, async user => {
 });
 
 byId("registerForm")?.addEventListener("submit", async event => {
-  event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); const button = form.querySelector("button");
-  try { button.disabled = true; setText("registerStatus", "Membuat akun..."); const credential = await createUserWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password"))); await updateProfile(credential.user, { displayName: String(data.get("name")).trim() }); await setDoc(doc(db, "customers", credential.user.uid), { name: String(data.get("name")).trim(), email: credential.user.email, createdAt: serverTimestamp() }, { merge: true }); form.reset(); setText("registerStatus", "Akun berhasil dibuat. Dashboard siap digunakan."); }
-  catch(err) { setText("registerStatus", `Pendaftaran gagal: ${err.code || err.message}`); } finally { button.disabled = false; }
+  event.preventDefault();
+  if (!registrationEnabled) { setText("registerStatus", "Pendaftaran akun sedang ditutup oleh admin."); return; }
+  const form = event.currentTarget, data = new FormData(form), button = form.querySelector('[type="submit"]');
+  if (button.disabled) return;
+  try {
+    button.disabled = true; setText("registerStatus", "Membuat akun...");
+    const credential = await createUserWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password")));
+    await updateProfile(credential.user, { displayName: String(data.get("name")).trim() });
+    await setDoc(doc(db, "customers", credential.user.uid), { name: String(data.get("name")).trim(), email: credential.user.email, createdAt: serverTimestamp() }, { merge: true });
+    form.reset(); setText("registerStatus", "Akun berhasil dibuat. Dashboard siap digunakan.");
+  } catch(err) { setText("registerStatus", err.code === "auth/email-already-in-use" ? "Email sudah terdaftar. Silakan login." : `Pendaftaran gagal: ${err.code || err.message}`); }
+  finally { button.disabled = false; }
 });
 
 byId("customerLoginForm")?.addEventListener("submit", async event => {
-  event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); const button = form.querySelector("button");
-  try { button.disabled = true; setText("customerLoginStatus", "Memproses login..."); await signInWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password"))); form.reset(); setText("customerLoginStatus", "Login berhasil."); }
-  catch(err) { setText("customerLoginStatus", `Login gagal: ${err.code || err.message}`); } finally { button.disabled = false; }
+  event.preventDefault();
+  const form = event.currentTarget, data = new FormData(form), button = form.querySelector('[type="submit"]');
+  const until = Number(sessionStorage.getItem(loginCooldownKey) || 0), remaining = until - Date.now();
+  if (remaining > 0) { setText("customerLoginStatus", `Terlalu banyak percobaan. Coba lagi dalam ${Math.ceil(remaining/60000)} menit.`); return; }
+  if (button.disabled) return;
+  try { button.disabled = true; setText("customerLoginStatus", "Memproses login..."); await signInWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password"))); sessionStorage.removeItem(loginCooldownKey); form.reset(); setText("customerLoginStatus", "Login berhasil."); }
+  catch(err) {
+    if (err.code === "auth/too-many-requests") sessionStorage.setItem(loginCooldownKey, String(Date.now()+15*60*1000));
+    const messages = {"auth/too-many-requests":"Firebase membatasi percobaan sementara. Tunggu 15 menit sebelum mencoba lagi.","auth/invalid-credential":"Email atau password tidak sesuai.","auth/user-not-found":"Akun tidak ditemukan.","auth/wrong-password":"Password tidak benar.","auth/network-request-failed":"Koneksi internet bermasalah."};
+    setText("customerLoginStatus", messages[err.code] || `Login gagal: ${err.code || err.message}`);
+  } finally { button.disabled = false; }
 });
 byId("customerLogout")?.addEventListener("click", () => signOut(auth));
+byId("customerResetPassword")?.addEventListener("click", async () => { const email = byId("customerResetEmail")?.value.trim() || document.querySelector("#customerLoginForm [name=\"email\"]")?.value.trim(); if (!email) { setText("customerLoginStatus", "Masukkan email akun terlebih dahulu."); return; } try { await sendPasswordResetEmail(auth, email); setText("customerLoginStatus", "Link reset password dikirim jika email terdaftar. Periksa inbox/spam."); } catch (err) { setText("customerLoginStatus", `Tidak dapat mengirim reset password: ${err.code || err.message}`); } });
 byId("refreshCustomerOrders")?.addEventListener("click", refreshCustomerOrders);
+document.addEventListener("click", event => { const b = event.target.closest(".copy-order-code"); if (!b) return; navigator.clipboard?.writeText(b.dataset.code || "").then(() => setText("registerStatus", "Kode pesanan disalin.")).catch(() => setText("registerStatus", "Tidak dapat menyalin otomatis; salin kode secara manual.")); });
 
 const orderForm = byId("orderForm");
 if (orderForm) orderForm.addEventListener("submit", async event => {

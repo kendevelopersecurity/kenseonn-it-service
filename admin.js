@@ -40,6 +40,8 @@ let services = [];
 let packages = [];
 let orders = [];
 let busy = false;
+let customers = [];
+const adminLoginCooldownKey = "kenseonn_admin_login_until";
 
 const defaultServices = [
   ['security-assessment', '🛡️', 'Audit Keamanan Website', 'Pemeriksaan konfigurasi dan risiko keamanan website milik klien.'],
@@ -74,24 +76,8 @@ const defaultServices = [
   ['consultation', '🧑\u200d💼', 'Konsultasi IT', 'Konsultasi kebutuhan IT, estimasi pekerjaan, dan rekomendasi solusi.']
 ];
 
-const defaultPackages = (() => {
-  const prices = [80000, 160000, 320000, 400000, 480000, 560000, 640000, 720000, 800000, 880000];
-  const quantities = ["1K", "2K", "3K", "4K", "5K", "6K", "7K", "8K", "9K", "10K"];
-  const result = [];
-
-  for (const platform of ["instagram", "tiktok"]) {
-    quantities.forEach((qty, i) => {
-      result.push({
-        platform,
-        qty,
-        price: prices[i],
-        guarantee: i === 9 ? "30 hari" : "7 hari"
-      });
-    });
-  }
-
-  return result;
-})();
+// Tidak membuat paket/harga contoh otomatis agar pelanggan tidak melihat harga fiktif.
+const defaultPackages = [];
 
 function esc(value = "") {
   return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -121,6 +107,7 @@ function setBusy(button, value) {
 function getFormValue(form, name) {
   return form.elements.namedItem(name);
 }
+
 
 // LOGIN DAN PEMERIKSAAN ADMIN
 
@@ -160,6 +147,9 @@ $("loginForm")?.addEventListener("submit", async event => {
   const form = event.currentTarget;
   const button = form.querySelector('[type="submit"]');
 
+  const until = Number(sessionStorage.getItem(adminLoginCooldownKey) || 0);
+  if (until > Date.now()) { showStatus("loginStatus", `Terlalu banyak percobaan. Coba lagi dalam ${Math.ceil((until-Date.now())/60000)} menit.`); return; }
+  if (button.disabled) return;
   showStatus("loginStatus", "Memproses login...");
   setBusy(button, true);
 
@@ -170,7 +160,9 @@ $("loginForm")?.addEventListener("submit", async event => {
       $("loginPassword").value
     );
   } catch (error) {
-    showStatus("loginStatus", showError("Login gagal", error));
+    if (error.code === "auth/too-many-requests") sessionStorage.setItem(adminLoginCooldownKey, String(Date.now()+15*60*1000));
+    const message = error.code === "auth/too-many-requests" ? "Firebase membatasi login sementara. Tunggu 15 menit dan jangan klik berulang." : error.code === "auth/invalid-credential" ? "Email atau password admin tidak sesuai." : `${error.code || error.message}`;
+    showStatus("loginStatus", `Login gagal: ${message}`);
   } finally {
     setBusy(button, false);
   }
@@ -217,14 +209,6 @@ async function ensureDefaults() {
     }
   }
 
-  const packagesSnap = await getDocs(collection(db, "packages"));
-
-  if (packagesSnap.empty) {
-    for (const item of defaultPackages) {
-      await addDoc(collection(db, "packages"), item);
-    }
-  }
-
   const siteRef = doc(db, "siteConfig", "main");
   const siteSnap = await getDoc(siteRef);
 
@@ -239,6 +223,7 @@ async function ensureDefaults() {
       instagram: "kenseonn",
       whatsapp: "62895636069948",
       experience: "4+ years learning & building",
+      registrationEnabled: true,
       maintenanceEnabled: false,
       maintenanceTitle: "Website sedang maintenance",
       maintenanceMessage: "Silakan kembali beberapa saat lagi.",
@@ -258,7 +243,8 @@ async function refreshAll() {
       loadSite(),
       loadServices(),
       loadPackages(),
-      loadOrders()
+      loadOrders(),
+      loadCustomers()
     ]);
 
     showStatus("siteStatus", "Data berhasil dimuat ✓");
@@ -266,6 +252,7 @@ async function refreshAll() {
     showStatus("siteStatus", showError("Gagal memuat data", error));
   }
 }
+
 
 async function loadSite() {
   const snapshot = await getDoc(doc(db, "siteConfig", "main"));
@@ -328,7 +315,24 @@ async function loadOrders() {
 
   showStatus("statOrders", orders.length);
   renderOrders();
+  if (typeof renderOrderTools === "function") renderOrderTools();
 }
+
+async function loadCustomers() {
+  const snapshot = await getDocs(collection(db, "customers"));
+  customers = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+  const count = $("statCustomers"); if (count) count.textContent = customers.length;
+  renderCustomers();
+}
+
+function renderCustomers() {
+  const target = $("customersAdminList"); if (!target) return;
+  const q = String($("customerSearch")?.value || "").toLowerCase();
+  const list = customers.filter(c => [c.name,c.email,c.phone,c.id].some(v => String(v||"").toLowerCase().includes(q)));
+  target.innerHTML = list.map(c => `<article class="admin-row"><div><b>${esc(c.name || "Pelanggan")}</b><small>${esc(c.email || "")} · UID ${esc(c.id)}</small></div><span class="status-chip">Customer</span></article>`).join("") || '<p class="muted-note">Belum ada pelanggan yang cocok.</p>';
+}
+$("customerSearch")?.addEventListener("input", renderCustomers);
+$("showArchivedOrders")?.addEventListener("change", renderOrders);
 
 // SIMPAN WEBSITE DAN MAINTENANCE MODE
 
@@ -344,6 +348,7 @@ $("siteForm")?.addEventListener("submit", async event => {
   // Karena itu, baca langsung dari elemen form.
   const maintenanceField = getFormValue(form, "maintenanceEnabled");
   data.maintenanceEnabled = maintenanceField?.checked === true;
+  data.registrationEnabled = getFormValue(form, "registrationEnabled")?.checked !== false;
 
   const untilField = getFormValue(form, "maintenanceUntil");
   data.maintenanceUntil = untilField?.value || "";
@@ -355,6 +360,7 @@ $("siteForm")?.addEventListener("submit", async event => {
     await setDoc(doc(db, "siteConfig", "main"), data, { merge: true });
 
     showStatus("siteStatus", "Pengaturan berhasil disimpan ✓");
+    await auditAdmin("Ubah pengaturan website", `Pendaftaran: ${data.registrationEnabled ? "ON" : "OFF"}; maintenance: ${data.maintenanceEnabled ? "ON" : "OFF"}`);
   } catch (error) {
     showStatus("siteStatus", showError("Gagal menyimpan website", error));
   } finally {
@@ -422,6 +428,7 @@ $("packageForm")?.addEventListener("submit", async event => {
 
   const data = {
     platform: String(fields.get("platform") || "").trim(),
+    type: String(fields.get("type") || "Followers").trim(),
     qty: String(fields.get("qty") || "").trim().toUpperCase(),
     price: Number(fields.get("price")),
     guarantee: String(fields.get("guarantee") || "").trim()
@@ -499,7 +506,7 @@ function renderPackages() {
   container.innerHTML = sorted.map(item => `
     <div class="admin-row">
       <div>
-        <b>${esc(item.platform)} ${esc(item.qty)}</b>
+        <b>${esc(item.platform)} ${esc(item.qty)} ${esc(item.type || "Followers")}</b>
         <small>Rp ${money(item.price)} • Garansi ${esc(item.guarantee)}</small>
       </div>
       <button type="button" class="btn small edit-package"
@@ -516,7 +523,9 @@ function renderOrders() {
   const container = $("ordersAdminList");
   if (!container) return;
 
-  container.innerHTML = orders.map(item => `
+  const showArchived = $("showArchivedOrders")?.checked === true;
+  const visibleOrders = orders.filter(item => showArchived ? item.archived === true : item.archived !== true);
+  container.innerHTML = visibleOrders.map(item => `
     <div class="order-row order-row-expanded">
       <div>
         <b>${esc(item.orderCode || item.id)} · ${esc(item.name || "Tanpa nama")} • ${esc(item.service || "")}</b>
@@ -528,6 +537,7 @@ function renderOrders() {
           <label>Total tagihan (Rp)<input class="order-price-input" data-id="${esc(item.id)}" type="number" min="0" step="1000" value="${Number(item.price)||0}"></label>
           <label class="payment-note-field">Instruksi / catatan pembayaran<input class="payment-note-input" data-id="${esc(item.id)}" maxlength="500" value="${esc(item.paymentNote || "")}" placeholder="Transfer ke ..."></label>
           <button type="button" class="btn small save-order-payment" data-id="${esc(item.id)}">Simpan pembayaran</button>
+          ${["done","cancelled"].includes(item.status) && !item.archived ? `<button type="button" class="btn small archive-order" data-id="${esc(item.id)}">Arsipkan</button>` : ""}${item.archived ? `<button type="button" class="btn small restore-order" data-id="${esc(item.id)}">Pulihkan</button>` : ""}
         </div>
       </div>
     </div>
@@ -539,6 +549,25 @@ function renderOrders() {
 document.addEventListener("click", async event => {
   const button = event.target.closest("button");
   if (!button) return;
+
+  if (button.classList.contains("archive-order") || button.classList.contains("restore-order")) {
+    const item = orders.find(order => order.id === button.dataset.id);
+    if (!item || !["done", "cancelled"].includes(item.status)) { alert("Hanya pesanan selesai atau dibatalkan yang dapat diarsipkan."); return; }
+    const archived = button.classList.contains("archive-order");
+    if (!confirm(archived ? "Arsipkan pesanan ini? Data tetap tersimpan." : "Pulihkan pesanan dari arsip?")) return;
+    try { button.disabled = true; await updateDoc(doc(db, "orders", item.id), { archived, updatedAt: serverTimestamp() }); await loadOrders(); }
+    catch (error) { alert(showError("Gagal mengubah arsip pesanan", error)); button.disabled = false; }
+    return;
+  }
+
+  if (button.classList.contains("delete-order")) {
+    const item = orders.find(order => order.id === button.dataset.id);
+    if (!item || !["done", "cancelled"].includes(item.status)) { alert("Hanya pesanan selesai atau dibatalkan yang dapat dihapus."); return; }
+    if (!confirm(`Hapus pesanan ${item.orderCode || item.id} secara permanen? Tindakan ini tidak dapat dibatalkan.`)) return;
+    try { button.disabled = true; await deleteDoc(doc(db, "orders", item.id)); await loadOrders(); alert("Pesanan berhasil dihapus."); }
+    catch (error) { alert(showError("Gagal menghapus pesanan", error)); button.disabled = false; }
+    return;
+  }
 
   if (button.classList.contains("edit-service")) {
     const item = services.find(service => service.id === button.dataset.id);
@@ -572,7 +601,7 @@ document.addEventListener("click", async event => {
     const form = $("packageForm");
     if (!item || !form) return;
 
-    for (const key of ["id", "platform", "qty", "price", "guarantee"]) {
+    for (const key of ["id", "platform", "type", "qty", "price", "guarantee"]) {
       const field = getFormValue(form, key);
       if (field) field.value = item[key] ?? "";
     }
@@ -622,6 +651,7 @@ document.addEventListener("change", async event => {
     });
 
     showStatus("siteStatus", "Status order berhasil diperbarui ✓");
+    await loadOrders();
   } catch (error) {
     alert(showError("Gagal memperbarui status order", error));
     await loadOrders().catch(loadError => {
@@ -670,7 +700,8 @@ function csvDownload(name,rows){const csv=rows.map(r=>r.map(v=>'"'+String(v??"")
 function dateValue(v){try{return v?.toDate?v.toDate().toLocaleString("id-ID"):"";}catch{return "";}}
 function renderOrderTools(){
  const q=($("orderSearch")?.value||"").toLowerCase(),st=$("orderFilter")?.value||"all";
- const filtered=orders.filter(o=>(st==="all"||o.status===st)&&[o.name,o.phone,o.service,o.orderCode,o.details].some(v=>String(v||"").toLowerCase().includes(q)));
+ const archivedOnly=$("showArchivedOrders")?.checked===true;
+ const filtered=orders.filter(o=>(archivedOnly?o.archived===true:o.archived!==true)&&(st==="all"||o.status===st)&&[o.name,o.phone,o.service,o.orderCode,o.details].some(v=>String(v||"").toLowerCase().includes(q)));
  const c=$("ordersAdminList");if(!c)return;
  c.innerHTML=filtered.map(item=>`<div class="order-row order-row-expanded"><div>
  <b>${esc(item.orderCode||item.id)} · ${esc(item.name||"Tanpa nama")} — ${esc(item.service||"")}</b>
@@ -681,9 +712,10 @@ function renderOrderTools(){
  <label>Total tagihan (Rp)<input class="order-price-input" data-id="${esc(item.id)}" type="number" min="0" step="1000" value="${Number(item.price)||0}"></label>
  <label class="payment-note-field">Instruksi pembayaran<input class="payment-note-input" data-id="${esc(item.id)}" maxlength="500" value="${esc(item.paymentNote||"")}" placeholder="Transfer ke ..."></label>
  <button type="button" class="btn small save-order-payment" data-id="${esc(item.id)}">Simpan pembayaran</button>
+          ${["done","cancelled"].includes(item.status) && !item.archived ? `<button type="button" class="btn small archive-order" data-id="${esc(item.id)}">Arsipkan</button>` : ""}${item.archived ? `<button type="button" class="btn small restore-order" data-id="${esc(item.id)}">Pulihkan</button>` : ""}
  </div></div></div>`).join("")||'<p class="muted-note">Tidak ada pesanan yang cocok.</p>';
 }
-$("orderSearch")?.addEventListener("input",renderOrderTools);$("orderFilter")?.addEventListener("change",renderOrderTools);
+$("orderSearch")?.addEventListener("input",renderOrderTools);$("orderFilter")?.addEventListener("change",renderOrderTools);$("showArchivedOrders")?.addEventListener("change",renderOrderTools);
 $("exportOrders")?.addEventListener("click",()=>{csvDownload("kenseonn-orders.csv",[["Order ID","Kode","Nama","WhatsApp","Email","Layanan","Detail","Status","Dibuat"],...orders.map(o=>[o.id,o.orderCode,o.name,o.phone,o.email,o.service,o.details,o.status,dateValue(o.createdAt)])]);logActivity("Export data pesanan CSV");});
 $("exportCatalog")?.addEventListener("click",()=>{csvDownload("kenseonn-catalog.csv",[["Type","ID","Name/platform","Description/qty","Price","Guarantee","Active"],...services.map(x=>["service",x.id,x.name,x.description,"","",x.active!==false]),...packages.map(x=>["package",x.id,x.platform,x.qty,x.price,x.guarantee,true])]);logActivity("Export katalog CSV");});
 function renderAnalytics(){const total=orders.length,done=orders.filter(o=>o.status==="done").length,active=orders.filter(o=>["new","contacted","paid","processing"].includes(o.status)).length;$("anaTotal").textContent=total;$("anaActive").textContent=active;$("anaDone").textContent=done;$("anaRate").textContent=(total?Math.round(done/total*100):0)+"%";const counts={};orders.forEach(o=>counts[o.status||"unknown"]=(counts[o.status||"unknown"]||0)+1);$("statusBars").innerHTML=Object.entries(counts).map(([k,v])=>`<div class="bar-row"><span>${esc(k)}</span><div><i style="width:${total?v/total*100:0}%"></i></div><b>${v}</b></div>`).join("")||"Belum ada data.";const popular={};orders.forEach(o=>popular[o.service||"Tidak diketahui"]=(popular[o.service||"Tidak diketahui"]||0)+1);$("popularServices").innerHTML=Object.entries(popular).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>`<div class="admin-row"><b>${esc(k)}</b><span>${v} order</span></div>`).join("")||"Belum ada pesanan.";$("statNew").textContent=orders.filter(o=>o.status==="new").length;$("statDone").textContent=done;$("statRevenue").textContent="Rp "+money(orders.filter(o=>["paid","done"].includes(o.status)).reduce((sum,o)=>sum+Number(o.price||0),0));}
