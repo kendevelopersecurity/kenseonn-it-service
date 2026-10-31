@@ -361,24 +361,41 @@ async function refreshCustomerOrders() {
   } catch (err) { target.innerHTML = `<p class="form-status">Gagal memuat pesanan: ${esc(err.code || err.message)}</p>`; }
 }
 
-onAuthStateChanged(auth, async user => {
-  currentCustomer = user;
-  if (authGuest) authGuest.classList.toggle("hidden", !!user);
-  if (customerDashboard) customerDashboard.classList.toggle("hidden", !user);
-  if (!user) return;
-  if (!user.emailVerified) {
-    setText("customerLoginStatus", "Email belum diverifikasi. Buka Gmail, klik tautan verifikasi dari Firebase, lalu login kembali.");
-    if (customerDashboard) customerDashboard.classList.add("hidden");
+onAuthStateChanged(auth, async authUser => {
+  try {
+    if (!authUser) {
+      currentCustomer = null;
+      if (authGuest) authGuest.classList.remove("hidden");
+      if (customerDashboard) customerDashboard.classList.add("hidden");
+      const emailField = document.querySelector('#orderForm [name="email"]');
+      if (emailField) emailField.readOnly = false;
+      return;
+    }
+    // Refresh the Firebase user before deciding whether to show the dashboard.
+    await reload(authUser);
+    const user = auth.currentUser || authUser;
+    currentCustomer = user;
+    if (!user.emailVerified) {
+      if (authGuest) authGuest.classList.remove("hidden");
+      if (customerDashboard) customerDashboard.classList.add("hidden");
+      setText("customerLoginStatus", "Email belum diverifikasi. Buka tautan verifikasi terbaru di Gmail, lalu login kembali.");
+      return;
+    }
+    if (authGuest) authGuest.classList.add("hidden");
+    if (customerDashboard) customerDashboard.classList.remove("hidden");
+    setText("customerName", user.displayName || "Pelanggan Kenseonn");
+    setText("customerEmail", user.email || "");
+    const emailField = document.querySelector('#orderForm [name="email"]');
+    if (emailField) { emailField.value = user.email || ""; emailField.readOnly = false; }
+    const nameField = document.querySelector('#orderForm [name="name"]');
+    if (nameField && user.displayName && !nameField.value) nameField.value = user.displayName;
+    await refreshCustomerOrders();
+  } catch (err) {
+    console.error("Customer session/dashboard error:", err);
+    setText("customerLoginStatus", `Sesi masuk terdeteksi, tetapi dashboard gagal dimuat: ${err.code || err.message}`);
     if (authGuest) authGuest.classList.remove("hidden");
-    return;
+    if (customerDashboard) customerDashboard.classList.add("hidden");
   }
-  setText("customerName", user.displayName || "Pelanggan Kenseonn");
-  setText("customerEmail", user.email || "");
-  const emailField = document.querySelector('#orderForm [name="email"]');
-  if (emailField) emailField.value = user.email || "";
-  const nameField = document.querySelector('#orderForm [name="name"]');
-  if (nameField && user.displayName) nameField.value = user.displayName;
-  await refreshCustomerOrders();
 });
 
 byId("registerForm")?.addEventListener("submit", async event => {
@@ -443,10 +460,16 @@ byId("customerLoginForm")?.addEventListener("submit", async event => {
       }
       return;
     }
-    await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, emailVerified: true, updatedAt: serverTimestamp() }, { merge: true });
+    // Profile sync is best-effort; Firestore profile failure must not undo Firebase Auth login.
+    try {
+      await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, emailVerified: true, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (profileError) {
+      console.warn("Login OK; customer profile sync pending:", profileError);
+      setText("customerLoginStatus", "Login berhasil. Profil belum tersinkron ke database; dashboard tetap dibuka.");
+    }
     sessionStorage.removeItem(loginCooldownKey);
     form.reset();
-    setText("customerLoginStatus", "Login berhasil.");
+    if (!byId("customerLoginStatus")?.textContent.includes("Profil belum tersinkron")) setText("customerLoginStatus", "Login berhasil.");
   }
   catch(err) {
     if (err.code === "auth/too-many-requests") sessionStorage.setItem(loginCooldownKey, String(Date.now()+15*60*1000));
@@ -504,22 +527,31 @@ document.addEventListener("click", event => { const b = event.target.closest(".c
 const orderForm = byId("orderForm");
 if (orderForm) orderForm.addEventListener("submit", async event => {
   event.preventDefault();
-  const form = event.currentTarget, submitButton = form.querySelector('[type="submit"]');
-  if (!currentCustomer || !currentCustomer.emailVerified) { showOrderStatus("Silakan daftar atau masuk melalui Customer Dashboard sebelum membuat pesanan."); byId("account")?.scrollIntoView({behavior:"smooth"}); return; }
-  if (!form.reportValidity()) return;
-  const fields = new FormData(form);
-  const name = String(fields.get("name") || currentCustomer.displayName || "Pelanggan").trim();
-  const phone = String(fields.get("phone") || "").trim();
-  const email = currentCustomer.email || "";
-  const service = String(fields.get("service") || "").trim();
-  const details = String(fields.get("details") || "").trim();
+  const form = event.currentTarget, button = form.querySelector('[type="submit"]');
+  if (!form.reportValidity() || button.disabled) return;
+  const f = new FormData(form);
+  const name = String(f.get("name")||"").trim();
+  const phone = String(f.get("phone")||"").trim();
+  const email = String(f.get("email")||"").trim().toLowerCase();
+  const service = String(f.get("service")||"").trim();
+  const details = String(f.get("details")||"").trim();
   const consent = form.querySelector('[type="checkbox"]');
-  if (!name || phone.length < 7 || !service || details.length < 5) { showOrderStatus("Periksa nama, nomor WhatsApp, layanan, dan detail pesanan."); return; }
-  if (consent && !consent.checked) { showOrderStatus("Centang persetujuan sebelum mengirim pesanan."); return; }
-  const data = { uid: currentCustomer.uid, name, phone, email, service, details, status:"new", paymentStatus:"awaiting_quote", price:0, paymentNote:"Menunggu admin mengonfirmasi total tagihan dan instruksi pembayaran.", orderCode:`KN-${Date.now().toString(36).toUpperCase()}`, source:"customer-dashboard", createdAt:serverTimestamp() };
-  try { showOrderStatus("Mengirim pesanan..."); submitButton.disabled = true; await addDoc(collection(db,"orders"), data); showOrderStatus("Pesanan berhasil dikirim. Pantau status dan tagihan di Customer Dashboard.", true); form.reset(); const emailField=form.querySelector('[name="email"]'); if(emailField) emailField.value=currentCustomer.email||""; await refreshCustomerOrders(); byId("account")?.scrollIntoView({behavior:"smooth"}); }
-  catch(err) { console.error(err); showOrderStatus(`Pesanan gagal (${err.code || "unknown"}). Pastikan Firebase Rules versi terbaru sudah dipasang.`); }
-  finally { submitButton.disabled = false; }
+  if(name.length<2 || phone.replace(/\D/g,"").length<7 || !email || !service || details.length<5){showOrderStatus("Periksa nama, WhatsApp, email, layanan, dan detail pesanan.");return;}
+  if(consent && !consent.checked){showOrderStatus("Centang persetujuan sebelum mengirim pesanan.");return;}
+  const orderCode = `KN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+  const payload = { uid:null, name, phone, email, service, details, status:"new", paymentStatus:"awaiting_quote", price:0, paymentNote:"Menunggu admin mengonfirmasi total tagihan dan instruksi pembayaran.", orderCode, source:"guest-order-v5", createdAt:serverTimestamp() };
+  try { button.disabled=true; showOrderStatus("Mengirim pesanan..."); await addDoc(collection(db,"orders"),payload); showOrderStatus(`Pesanan berhasil dikirim. Simpan kode ${orderCode}. Admin akan menghubungi Anda.`,true); form.reset(); }
+  catch(err){ console.error("Guest order failed",err); showOrderStatus(`Pesanan gagal dikirim (${err.code||err.message}). Hubungi admin melalui WhatsApp.`); }
+  finally {button.disabled=false;}
+});
+
+const ticketForm = byId("ticketForm");
+if(ticketForm) ticketForm.addEventListener("submit", async event=>{
+  event.preventDefault(); const form=event.currentTarget, button=form.querySelector('[type="submit"]'); if(!form.reportValidity()||button.disabled)return;
+  const f=new FormData(form); const ticketCode=`KT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+  const data={ticketCode,name:String(f.get('name')||'').trim(),email:String(f.get('email')||'').trim().toLowerCase(),phone:String(f.get('phone')||'').trim(),category:String(f.get('category')||'Perlu bantuan'),message:String(f.get('message')||'').trim(),status:'open',createdAt:serverTimestamp(),source:'public-helpdesk-v5'};
+  try{button.disabled=true;byId('ticketStatus').textContent='Mengirim tiket...';await addDoc(collection(db,'supportTickets'),data);byId('ticketStatus').textContent=`Tiket terkirim. Simpan kode ${ticketCode}; admin akan menghubungi kontak Anda.`;form.reset();}
+  catch(err){console.error(err);byId('ticketStatus').textContent=`Tiket gagal dikirim (${err.code||err.message}).`;}finally{button.disabled=false;}
 });
 
 loadData();

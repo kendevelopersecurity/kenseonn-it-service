@@ -99,46 +99,35 @@
       </div>
     </section>
 
-    <section id="faq" class="section faq">
+    <section id="support" class="section"><div class="order-panel"><span class="kicker">HELP DESK</span><h2>Ticket Bantuan & Komentar</h2><p>Kirim pertanyaan atau komplain tanpa membuat akun. Admin akan menindaklanjuti melalui kontak yang kamu berikan.</p><form id="ticketForm"><div class="form-grid"><label>Nama<input name="name" required maxlength="80"></label><label>Email<input name="email" type="email" required maxlength="120"></label><label>WhatsApp<input name="phone" required maxlength="25"></label><label>Jenis tiket<select name="category"><option>Perlu bantuan</option><option>Komplain pesanan</option><option>Pertanyaan pembayaran</option><option>Saran / komentar</option><option>Laporan keamanan</option></select></label></div><label>Pesan<textarea name="message" required minlength="5" maxlength="1500" placeholder="Jelaskan kendala atau pertanyaan..." ></textarea></label><button class="btn primary" type="submit">Kirim Tiket</button><p id="ticketStatus" class="form-status" aria-live="polite"></p></form></div></section>
+
+<section id="faq" class="section faq">
       <div class="section-head"><div><span class="kicker">04 / FAQ</span><h2>Ketentuan</h2></div></div>
       <details open><summary>Apakah layanan security testing legal?</summary><p>Ya, hanya untuk aset milik klien atau aset yang memiliki izin pengujian. Scope, target, waktu, dan batas pengujian harus disepakati sebelum pekerjaan dimulai.</p></details>
       <details><summary>Apakah data pelanggan aman?</summary><p>Order disimpan di Firebase Firestore. Akses order dibatasi untuk admin, sementara pengunjung hanya dapat membuat order baru. Tetap hindari memasukkan password, OTP, private key, atau data sensitif ke formulir.</p></details>
       <details><summary>Bagaimana cara order?</summary><p>Pilih layanan, isi detail kontak dan kebutuhan, lalu kirim. Admin akan menghubungi Anda untuk konfirmasi scope, harga, jadwal, dan ketentuan.</p></details>
     </section>
-
-    <section id="account" class="section account-section">
-      <div class="order-panel account-panel">
-        <div><span class="kicker">CUSTOMER PORTAL</span><h2>Customer Dashboard</h2><p>Daftar atau masuk untuk membuat pesanan, melihat status, dan memeriksa instruksi pembayaran langsung per pesanan.</p></div>
-        <section id="firebaseActionPanel" class="account-form hidden" aria-live="polite"><h3>Konfirmasi akun</h3><p id="firebaseActionStatus" class="form-status">Memeriksa tautan Firebase...</p><form id="firebaseResetForm" class="hidden"><label>Password baru<input id="firebaseNewPassword" type="password" minlength="8" required autocomplete="new-password"></label><button class="btn primary" type="submit">Simpan password baru</button></form></section>
-        <div id="authGuest" class="account-grid">
-          <form id="registerForm" class="account-form"><h3>Buat akun pelanggan</h3><label>Nama lengkap<input name="name" required maxlength="80" autocomplete="name"></label><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required minlength="8" autocomplete="new-password"></label><small class="muted-note">Gunakan alamat Gmail/email aktif milik Anda. Setelah daftar, Firebase mengirim tautan verifikasi ke inbox Gmail (periksa Spam). Akun baru bisa digunakan setelah email diverifikasi. Website tidak meminta password Gmail atau kode OTP pribadi.</small><button class="btn primary" type="submit">Daftar akun & kirim verifikasi</button><p id="registerStatus" class="form-status"></p></form><p id="registrationDisabledNotice" class="form-status hidden">Pendaftaran akun baru sedang ditutup. Silakan login jika sudah memiliki akun.</p>
-          <form id="customerLoginForm" class="account-form"><h3>Masuk pelanggan</h3><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required autocomplete="current-password"></label><div class="action-row"><button class="btn ghost">Masuk</button><button type="button" id="customerResetPassword" class="btn ghost">Lupa password?</button></div><p id="customerLoginStatus" class="form-status"></p><small class="muted-note">Jika link reset menampilkan kedaluwarsa, minta link baru dan buka email terbaru satu kali saja.</small></form>
-        </div>
-        <div id="customerDashboard" class="hidden"><div class="dashboard-welcome"><div><span class="kicker">AKUN AKTIF</span><h3 id="customerName">Pelanggan</h3><p id="customerEmail"></p></div><button id="customerLogout" type="button" class="btn ghost">Keluar</button></div><div class="dashboard-actions"><a class="btn primary" href="#order">Buat pesanan</a><button id="refreshCustomerOrders" type="button" class="btn ghost">Refresh pesanan</button></div><div id="customerOrders" class="customer-orders"><p class="muted-note">Belum ada pesanan.</p></div></div>
-      </div>
-    </section>
-
-    <section id="order" class="section order-section">
+<section id="order" class="section order-section">
       <div class="order-panel">
         <div><span class="kicker">05 / ORDER</span><h2>Request Service</h2><p>Isi detail layanan dan tautan publik yang relevan. Admin akan memeriksa pesanan secara manual. Jangan masukkan password, OTP, token, atau kredensial akun.</p></div>
         <form id="orderForm">
           <div class="form-grid">
             <label>Nama<input required name="name" maxlength="80" placeholder="Nama Anda"></label>
             <label>WhatsApp<input required name="phone" maxlength="25" placeholder="628..."></label>
-            <label>Email<input type="email" name="email" maxlength="120" placeholder="email@contoh.com" readonly></label>
+            <label>Email aktif<input required type="email" name="email" maxlength="120" placeholder="email@contoh.com" autocomplete="email"></label>
             <label>Layanan<select required name="service" id="serviceSelect"></select></label>
           </div>
           <label>Detail kebutuhan<textarea required name="details" maxlength="1500" placeholder="Tautan akun/postingan publik atau kebutuhan IT secara rinci. Jangan masukkan password/OTP."></textarea></label>
-          <div class="payment-info"><b>Pembayaran direct</b><p>Setelah order dikirim, admin akan menetapkan total tagihan dan mengirim instruksi pembayaran. Jangan transfer sebelum nominal dan rekening dikonfirmasi admin.</p><div id="paymentInstructions">Instruksi pembayaran akan ditampilkan setelah admin mengonfirmasi pesanan.</div></div>
+          <div class="payment-info"><b>Pembayaran direct</b><p>Setelah order dikirim, admin akan memeriksa kebutuhan, menetapkan harga, lalu menghubungi Anda melalui WhatsApp atau email. Jangan transfer sebelum nominal dan rekening dikonfirmasi admin.</p><div id="paymentInstructions">Instruksi pembayaran akan ditampilkan setelah admin mengonfirmasi pesanan.</div></div>
           <label class="check"><input type="checkbox" required> Saya menyatakan memiliki hak/izin atas aset yang diminta untuk diproses atau diuji.</label>
-          <button class="btn primary" type="submit">Kirim Order <span>→</span></button>
+          <button class="btn primary" type="submit">Kirim Pesanan <span>→</span></button>
           <div id="orderStatus" class="form-status"></div>
         </form>
       </div>
     </section>
   </main>
 
-  <footer><div>© <span id="year"></span> Kenseonn Ethical Hacking</div><div>Legal • Authorized • Confidential</div><a href="admin.html">Admin</a></footer>
+  <footer><div>© <span id="year"></span> Kenseonn Ethical Hacking</div><div>Legal • Authorized • Confidential</div><a href="#support">Bantuan / Tiket</a><a href="admin.html">Admin</a></footer>
 
   <script type="module" src="app.js"></script>
 </body>

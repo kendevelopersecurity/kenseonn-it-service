@@ -1,63 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function isAdmin() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
-    }
-
-    match /siteConfig/{docId} { allow read: if true; allow write: if isAdmin(); }
-    match /services/{serviceId} { allow read: if true; allow create, update, delete: if isAdmin(); }
-    match /packages/{packageId} { allow read: if true; allow create, update, delete: if isAdmin(); }
-    match /admins/{uid} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow write: if false;
-    }
-    match /customers/{uid} {
-      allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2
-        && request.resource.data.name.size() <= 80
-        && request.resource.data.email == request.auth.token.email;
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','updatedAt','emailVerified'])
-        && (!('emailVerified' in request.resource.data.diff(resource.data).affectedKeys()) || request.auth.token.email_verified == true));
-      allow delete: if isAdmin();
-    }
-    match /adminLogs/{logId} {
-      allow create: if isAdmin()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.action is string
-        && request.resource.data.action.size() <= 240;
-      allow read: if isAdmin();
-      allow update, delete: if false;
-    }
-    match /orders/{orderId} {
-      allow create: if signedIn()
-        && request.auth.token.email_verified == true
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
-        && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.service is string && request.resource.data.service.size() >= 2 && request.resource.data.service.size() <= 180
-        && request.resource.data.details is string && request.resource.data.details.size() >= 5 && request.resource.data.details.size() <= 1500
-        && request.resource.data.status == 'new'
-        && request.resource.data.paymentStatus == 'awaiting_quote'
-        && request.resource.data.price == 0;
-      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update, delete: if isAdmin();
-    }
-    // Admin-only operational registers added by Ultimate Operations v1.
-    match /{moduleCollection}/{recordId} {
-      allow read, create, update, delete: if isAdmin() && moduleCollection in [
-        'adminRoles', 'fraudCases', 'orderTracking', 'complaints', 'financeEntries',
-        'suppliers', 'announcements', 'deviceSessions', 'globalTasks',
-        'automationJobs', 'webhookConfigs', 'privacyRequests'
-      ];
-    }
-    match /{document=**} { allow read, write: if false; }
+ match /databases/{database}/documents {
+  function signedIn(){ return request.auth != null; }
+  function isAdmin(){ return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true; }
+  match /siteConfig/{id}{ allow read: if true; allow write: if isAdmin(); }
+  match /services/{id}{ allow read: if true; allow create,update,delete: if isAdmin(); }
+  match /packages/{id}{ allow read: if true; allow create,update,delete: if isAdmin(); }
+  match /admins/{uid}{ allow read: if isAdmin() || (signedIn() && request.auth.uid==uid); allow write: if false; }
+  match /orders/{id}{
+   allow create: if request.resource.data.keys().hasAll(['uid','name','phone','email','service','details','status','paymentStatus','price','orderCode','createdAt'])
+    && request.resource.data.uid == null
+    && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
+    && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25
+    && request.resource.data.email is string && request.resource.data.email.size() >= 5 && request.resource.data.email.size() <= 120
+    && request.resource.data.service is string && request.resource.data.service.size() >= 2 && request.resource.data.service.size() <= 180
+    && request.resource.data.details is string && request.resource.data.details.size() >= 5 && request.resource.data.details.size() <= 1500
+    && request.resource.data.status == 'new' && request.resource.data.paymentStatus == 'awaiting_quote' && request.resource.data.price == 0
+    && request.resource.data.orderCode is string && request.resource.data.orderCode.size() <= 40;
+   allow read: if isAdmin(); allow update,delete: if isAdmin();
   }
+  match /supportTickets/{id}{
+   allow create: if request.resource.data.keys().hasAll(['ticketCode','name','email','phone','category','message','status','createdAt'])
+    && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
+    && request.resource.data.email is string && request.resource.data.email.size() >= 5 && request.resource.data.email.size() <= 120
+    && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25
+    && request.resource.data.message is string && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 1500
+    && request.resource.data.status == 'open';
+   allow read,update,delete: if isAdmin();
+  }
+  match /customers/{uid}{ allow read,write: if false; }
+  match /adminLogs/{id}{ allow read,create: if isAdmin(); allow update,delete: if false; }
+  match /{document=**}{ allow read,write: if false; }
+ }
 }
