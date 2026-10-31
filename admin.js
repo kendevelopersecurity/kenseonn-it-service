@@ -52,6 +52,7 @@ let packages = [];
 let orders = [];
 let busy = false;
 let customers = [];
+let supportTickets = [];
 const adminLoginCooldownKey = "kenseonn_admin_login_until";
 
 const defaultServices = [
@@ -251,7 +252,7 @@ async function refreshAll() {
       loadServices(),
       loadPackages(),
       loadOrders(),
-      loadCustomers()
+      loadTickets()
     ]);
 
     showStatus("siteStatus", "Data berhasil dimuat ✓");
@@ -324,6 +325,54 @@ async function loadOrders() {
   renderOrders();
   if (typeof renderOrderTools === "function") renderOrderTools();
 }
+
+async function loadTickets() {
+  const snapshot = await getDocs(query(collection(db, "supportTickets"), orderBy("createdAt", "desc")));
+  supportTickets = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+  renderTickets();
+}
+
+function renderTickets() {
+  const target = $("ticketsAdminList");
+  if (!target) return;
+  if (!supportTickets.length) {
+    target.innerHTML = '<p class="muted-note">Belum ada tiket. Tiket baru akan tampil setelah pengunjung mengirim formulir bantuan dan data berhasil tersimpan di Firestore.</p>';
+    return;
+  }
+  target.innerHTML = supportTickets.map(ticket => `
+    <article class="admin-row ticket-row">
+      <div class="ticket-main">
+        <div class="ticket-heading"><b>${esc(ticket.ticketCode || ticket.id)}</b><span class="status-chip">${esc(ticket.status || "open")}</span></div>
+        <small>${esc(ticket.name || "Tanpa nama")} · ${esc(ticket.email || "")} · ${esc(ticket.phone || "")}<br>${esc(ticket.category || "Bantuan")} · ${esc(dateValue(ticket.createdAt))}</small>
+        <p class="ticket-message">${esc(ticket.message || "")}</p>
+        ${ticket.adminReply ? `<div class="ticket-reply"><b>Balasan admin</b><p>${esc(ticket.adminReply)}</p></div>` : ""}
+        <label class="ticket-reply-label">Balasan admin<textarea rows="3" data-ticket-reply="${esc(ticket.id)}" placeholder="Tulis balasan untuk pelanggan...">${esc(ticket.adminReply || "")}</textarea></label>
+        <div class="ticket-actions"><select data-ticket-status="${esc(ticket.id)}"><option value="open" ${ticket.status === "open" ? "selected" : ""}>Open</option><option value="in_progress" ${ticket.status === "in_progress" ? "selected" : ""}>Diproses</option><option value="resolved" ${ticket.status === "resolved" ? "selected" : ""}>Selesai</option><option value="closed" ${ticket.status === "closed" ? "selected" : ""}>Ditutup</option></select><button class="btn primary small save-ticket" data-id="${esc(ticket.id)}" type="button">Simpan Balasan & Status</button></div>
+      </div>
+    </article>`).join("");
+}
+
+$("refreshTickets")?.addEventListener("click", async () => {
+  const button = $("refreshTickets"); button.disabled = true;
+  try { await loadTickets(); }
+  catch (error) { alert(showError("Gagal memuat tiket bantuan", error)); }
+  finally { button.disabled = false; }
+});
+
+$("ticketsAdminList")?.addEventListener("click", async event => {
+  const button = event.target.closest(".save-ticket");
+  if (!button) return;
+  const id = button.dataset.id;
+  const reply = document.querySelector(`[data-ticket-reply="${id}"]`)?.value.trim() || "";
+  const status = document.querySelector(`[data-ticket-status="${id}"]`)?.value || "open";
+  button.disabled = true;
+  try {
+    await updateDoc(doc(db, "supportTickets", id), { adminReply: reply, status, updatedAt: serverTimestamp() });
+    await loadTickets();
+    logActivity(`Membalas/memperbarui tiket ${id}`);
+  } catch (error) { alert(showError("Gagal menyimpan balasan tiket", error)); }
+  finally { button.disabled = false; }
+});
 
 async function loadCustomers() {
   const snapshot = await getDocs(collection(db, "customers"));
@@ -773,7 +822,9 @@ $("runDiagnostics")?.addEventListener("click", async () => {
   check("Firebase Auth aktif", !!auth.currentUser, auth.currentUser ? "Sesi pengguna tersedia" : "Belum ada sesi pengguna");
   check("Admin login handler", !!$("loginForm") && !!$("loginForm").querySelector('[type="submit"]'), "Form dan tombol submit tersedia");
   try { await getDoc(doc(db,"siteConfig","main")); check("Firestore read", true, "Dokumen siteConfig/main dapat dibaca"); } catch(e) { check("Firestore read", false, `${e.code || e.message}`); }
-  try { await getDocs(query(collection(db,"customers"))); check("Database member", true, `${customers.length} member dimuat pada panel`); } catch(e) { check("Database member", false, `${e.code || e.message}`); }
+  check("Database member", true, "Tidak digunakan: sistem memakai pesanan tamu tanpa akun pelanggan.");
+  try { await getDocs(query(collection(db,"supportTickets"), orderBy("createdAt", "desc"))); check("Database tiket bantuan", true, "Koleksi supportTickets dapat dibaca admin."); } catch(e) { check("Database tiket bantuan", false, `${e.code || e.message}`); }
+  try { await getDocs(query(collection(db,"orders"), orderBy("createdAt", "desc"))); check("Database pesanan", true, "Koleksi orders dapat dibaca admin."); } catch(e) { check("Database pesanan", false, `${e.code || e.message}`); }
   const failed = checks.filter(x => !x.ok).length;
   out.textContent = `${checks.length - failed}/${checks.length} pemeriksaan lolos · ${failed} masalah`;
   list.innerHTML = checks.map(x => `<div class="diagnostic-row"><b>${x.ok ? "✓" : "✕"} ${esc(x.name)}</b><small>${esc(x.detail)}</small></div>`).join("");
@@ -814,63 +865,3 @@ $("designForm")?.elements.namedItem("theme")?.addEventListener("change",e=>{
  $("previewEffect")?.click();
 });
 refreshAll=async function(){await _refreshAllUltimate();try{await loadFeatureManager();}catch(e){console.warn("Feature Manager load:",e);}}
-
-// Ultimate Operations v1: Firestore-backed operational registers.
-const ultimateModules = {
-  adminRoles: 'Role Management (catatan role)', fraudCases: 'Fraud Detection (review manual)',
-  orderTracking: 'Order Tracking', complaints: 'Refund & Complaints', financeEntries: 'Finance & Expenses',
-  suppliers: 'Supplier Management', announcements: 'Member Announcements', deviceSessions: 'Device Session Registry',
-  globalTasks: 'Global Search / Follow-up', automationJobs: 'Scheduled Automation',
-  webhookConfigs: 'API & Webhooks', privacyRequests: 'Privacy & Data Protection'
-};
-function renderUltimateRecords(rows) {
-  const host = $('ultimateRecords');
-  if (!host) return;
-  if (!rows.length) { host.innerHTML = '<p>Belum ada catatan pada modul ini.</p>'; return; }
-  host.innerHTML = rows.map(row => `<article class="ultimate-record"><h4>${esc(row.title || 'Tanpa judul')}</h4><div class="ultimate-meta"><span>Status: ${esc(row.status || 'open')}</span>${row.amount ? `<span>Nominal: Rp ${money(row.amount)}</span>` : ''}<span>${esc(dateValue(row.createdAt) || 'Baru dibuat')}</span></div><p>${esc(row.details || '')}</p><small>ID: ${esc(row.id)}</small></article>`).join('');
-}
-async function loadUltimateRecords() {
-  const module = $('ultimateModule')?.value;
-  if (!module || !ultimateModules[module]) return;
-  $('ultimateListTitle').textContent = ultimateModules[module];
-  $('ultimateRecords').textContent = 'Memuat data...';
-  try {
-    const snap = await getDocs(collection(db, module));
-    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    rows.sort((a,b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-    renderUltimateRecords(rows);
-  } catch (error) {
-    $('ultimateRecords').textContent = showError('Gagal membaca modul', error);
-  }
-}
-$('ultimateModule')?.addEventListener('change', loadUltimateRecords);
-$('refreshUltimate')?.addEventListener('click', loadUltimateRecords);
-$('ultimateForm')?.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (!auth.currentUser) { showStatus('ultimateStatus', 'Sesi admin tidak ditemukan. Login ulang.'); return; }
-  const form = event.currentTarget;
-  const button = form.querySelector('[type="submit"]');
-  const module = form.elements.namedItem('module').value;
-  const title = form.elements.namedItem('title').value.trim();
-  const details = form.elements.namedItem('details').value.trim();
-  const amountRaw = form.elements.namedItem('amount').value;
-  if (!ultimateModules[module] || !title || !details) return;
-  setBusy(button, true); showStatus('ultimateStatus', 'Menyimpan ke Firestore...');
-  try {
-    await addDoc(collection(db, module), {
-      title: title.slice(0,120), details: details.slice(0,3000),
-      status: form.elements.namedItem('status').value,
-      amount: amountRaw === '' ? 0 : Math.max(0, Number(amountRaw) || 0),
-      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      createdBy: auth.currentUser.uid, createdByEmail: auth.currentUser.email || ''
-    });
-    form.elements.namedItem('title').value = '';
-    form.elements.namedItem('details').value = '';
-    form.elements.namedItem('amount').value = '';
-    showStatus('ultimateStatus', 'Catatan berhasil disimpan.');
-    logActivity(`Membuat catatan ${ultimateModules[module]}`);
-    await loadUltimateRecords();
-  } catch (error) {
-    showStatus('ultimateStatus', showError('Gagal menyimpan modul', error));
-  } finally { setBusy(button, false); }
-});
