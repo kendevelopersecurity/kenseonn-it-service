@@ -11,10 +11,10 @@ import {
   serverTimestamp,
   where
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, sendEmailVerification, reload, applyActionCode } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, sendEmailVerification, reload, applyActionCode, verifyPasswordResetCode, confirmPasswordReset } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 const emailVerificationSettings = {
-  url: "https://kendevelopersecurity.github.io/kenseonn-it-service/",
+  url: "https://kendevelopersecurity.github.io/kenseonn-it-service/?emailVerification=1",
   handleCodeInApp: false
 };
 import { firebaseConfig } from "./firebase-config.js";
@@ -110,7 +110,6 @@ async function loadData() {
     services = serviceSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(s => s.active !== false);
-    if (!services.length) services = fallbackServices;
 
     if (!packageSnap.empty) {
       packages = packageSnap.docs.map(d => ({
@@ -129,7 +128,6 @@ async function loadData() {
     if (catalogEl) catalogEl.classList.toggle("hidden", site.publicCatalogEnabled === false);
   } catch (err) {
     console.error("Gagal memuat data website:", err);
-    if (!services.length) services = fallbackServices;
     showOrderStatus(
       "Katalog online belum dapat dimuat. Silakan muat ulang atau hubungi admin."
     );
@@ -363,28 +361,6 @@ async function refreshCustomerOrders() {
   } catch (err) { target.innerHTML = `<p class="form-status">Gagal memuat pesanan: ${esc(err.code || err.message)}</p>`; }
 }
 
-// Firebase email action handler fallback: supports links that redirect back with mode/oobCode.
-// Standard Firebase-hosted action links verify automatically; this handles custom continue URLs too.
-(async function handleEmailActionLink() {
-  const params = new URLSearchParams(window.location.search);
-  const mode = params.get("mode");
-  const code = params.get("oobCode");
-  if (mode !== "verifyEmail" || !code) return;
-  const status = byId("customerLoginStatus") || byId("registerStatus");
-  if (status) status.textContent = "Memverifikasi alamat email...";
-  try {
-    await applyActionCode(auth, code);
-    if (status) status.textContent = "Email berhasil diverifikasi. Silakan masuk menggunakan email dan password akun kamu.";
-  } catch (err) {
-    const msg = err.code === "auth/expired-action-code" ? "Tautan verifikasi sudah kedaluwarsa. Masuk untuk meminta tautan baru." : err.code === "auth/invalid-action-code" ? "Tautan verifikasi sudah digunakan atau tidak valid. Masuk untuk meminta tautan baru." : `Verifikasi gagal: ${err.code || err.message}`;
-    if (status) status.textContent = msg;
-  } finally {
-    params.delete("mode"); params.delete("oobCode"); params.delete("apiKey"); params.delete("lang");
-    const clean = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
-    window.history.replaceState({}, document.title, clean);
-  }
-})();
-
 onAuthStateChanged(auth, async user => {
   currentCustomer = user;
   if (authGuest) authGuest.classList.toggle("hidden", !!user);
@@ -467,11 +443,7 @@ byId("customerLoginForm")?.addEventListener("submit", async event => {
       }
       return;
     }
-    try {
-      await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, emailVerified: true, updatedAt: serverTimestamp() }, { merge: true });
-    } catch (profileError) {
-      console.warn("Login berhasil, tetapi sinkronisasi profil Firestore tertunda:", profileError);
-    }
+    await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, emailVerified: true, updatedAt: serverTimestamp() }, { merge: true });
     sessionStorage.removeItem(loginCooldownKey);
     form.reset();
     setText("customerLoginStatus", "Login berhasil.");
@@ -483,28 +455,50 @@ byId("customerLoginForm")?.addEventListener("submit", async event => {
   } finally { button.disabled = false; }
 });
 byId("customerLogout")?.addEventListener("click", () => signOut(auth));
-byId("customerResetPassword")?.addEventListener("click", async () => { const email = byId("customerResetEmail")?.value.trim() || document.querySelector("#customerLoginForm [name=\"email\"]")?.value.trim(); if (!email) { setText("customerLoginStatus", "Masukkan email akun terlebih dahulu."); return; } try { await sendPasswordResetEmail(auth, email); setText("customerLoginStatus", "Link reset password dikirim jika email terdaftar. Periksa inbox/spam."); } catch (err) { setText("customerLoginStatus", `Tidak dapat mengirim reset password: ${err.code || err.message}`); } });
-byId("refreshCustomerOrders")?.addEventListener("click", refreshCustomerOrders);
-byId("customerCheckVerification")?.addEventListener("click", async () => {
-  const email = document.querySelector("#customerLoginForm [name=\"email\"]")?.value.trim();
-  const password = document.querySelector("#customerLoginForm [name=\"password\"]")?.value;
-  if (!email || !password) { setText("customerLoginStatus", "Masukkan email dan password, lalu tekan tombol ini untuk memeriksa status verifikasi."); return; }
+byId("customerResetPassword")?.addEventListener("click", async () => {
+  const email = document.querySelector('#customerLoginForm [name="email"]')?.value.trim();
+  if (!email) { setText("customerLoginStatus", "Isi email akun terlebih dahulu, lalu tekan Lupa password."); return; }
   try {
-    setText("customerLoginStatus", "Memeriksa status verifikasi...");
-    const credential = await signInWithEmailAndPassword(auth, email, password);
-    await reload(credential.user);
-    if (credential.user.emailVerified) {
-      setText("customerLoginStatus", "Email sudah terverifikasi. Dashboard pelanggan sedang dibuka.");
-    } else {
-      await sendEmailVerification(credential.user, emailVerificationSettings);
-      await signOut(auth);
-      setText("customerLoginStatus", "Email belum terverifikasi. Tautan verifikasi baru dikirim. Gunakan tautan paling baru.");
-    }
-  } catch (err) {
-    if (auth.currentUser) await signOut(auth).catch(() => {});
-    setText("customerLoginStatus", `Pemeriksaan gagal: ${err.code || err.message}`);
-  }
+    await sendPasswordResetEmail(auth, email, { url: "https://kendevelopersecurity.github.io/kenseonn-it-service/", handleCodeInApp: false });
+    setText("customerLoginStatus", "Email reset dikirim. Buka email PALING BARU dan gunakan tautan satu kali sebelum kedaluwarsa. Jangan gunakan tautan lama.");
+  } catch (err) { setText("customerLoginStatus", `Gagal mengirim reset: ${err.code || err.message}`); }
 });
+
+// Support Firebase action links when the email template redirects directly to this site.
+async function handleFirebaseActionLink() {
+  const params = new URLSearchParams(location.search);
+  const mode = params.get("mode"), code = params.get("oobCode");
+  if (!mode || !code) return;
+  const panel = byId("firebaseActionPanel");
+  const form = byId("firebaseResetForm");
+  if (panel) panel.classList.remove("hidden");
+  if (mode === "verifyEmail") {
+    try {
+      await applyActionCode(auth, code);
+      setText("firebaseActionStatus", "Email berhasil diverifikasi. Sekarang silakan masuk menggunakan akun pelanggan.");
+    } catch (err) { setText("firebaseActionStatus", `Tautan verifikasi tidak berlaku atau sudah digunakan (${err.code || "error"}). Minta tautan verifikasi baru dari halaman login.`); }
+  } else if (mode === "resetPassword") {
+    if (form) form.classList.remove("hidden");
+    try {
+      const email = await verifyPasswordResetCode(auth, code);
+      setText("firebaseActionStatus", `Atur password baru untuk ${email}.`);
+      form?.addEventListener("submit", async event => {
+        event.preventDefault();
+        const password = byId("firebaseNewPassword")?.value || "";
+        if (password.length < 8) { setText("firebaseActionStatus", "Password minimal 8 karakter."); return; }
+        try {
+          await confirmPasswordReset(auth, code, password);
+          setText("firebaseActionStatus", "Password berhasil diubah. Silakan kembali ke form login.");
+          form.reset(); form.classList.add("hidden");
+        } catch (err) { setText("firebaseActionStatus", `Gagal menyimpan password: ${err.code || err.message}`); }
+      }, { once: true });
+    } catch (err) { if (form) form.classList.add("hidden"); setText("firebaseActionStatus", `Tautan reset sudah kedaluwarsa atau pernah digunakan (${err.code || "auth/invalid-action-code"}). Kirim ulang permintaan reset dan gunakan email terbaru.`); }
+  } else {
+    setText("firebaseActionStatus", "Jenis tautan Firebase tidak didukung.");
+  }
+}
+handleFirebaseActionLink();
+byId("refreshCustomerOrders")?.addEventListener("click", refreshCustomerOrders);
 document.addEventListener("click", event => { const b = event.target.closest(".copy-order-code"); if (!b) return; navigator.clipboard?.writeText(b.dataset.code || "").then(() => setText("registerStatus", "Kode pesanan disalin.")).catch(() => setText("registerStatus", "Tidak dapat menyalin otomatis; salin kode secara manual.")); });
 
 const orderForm = byId("orderForm");
