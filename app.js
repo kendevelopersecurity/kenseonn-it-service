@@ -226,27 +226,37 @@ function render() {
   renderPackages(platforms[0] || "instagram");
 }
 
+function describeBoost(platform, type, qty, guarantee) {
+  const p = String(platform || "").toUpperCase(), t = String(type || "Followers").toLowerCase();
+  const copy = {
+    followers:`Layanan penambahan followers ${p} untuk membantu memperkuat bukti sosial dan tampilan profil kreator maupun bisnis.`,
+    likes:`Layanan likes ${p} untuk mendukung interaksi pada konten pilihan. Pastikan tautan konten bersifat publik.`,
+    views:`Layanan views ${p} untuk membantu meningkatkan jumlah tayangan pada konten yang dipilih.`,
+    comments:`Layanan komentar ${p} untuk menambah variasi interaksi. Detail komentar dikonfirmasi admin sebelum proses.`,
+    shares:`Layanan shares ${p} untuk mendukung distribusi konten agar lebih mudah ditemukan audiens.`,
+    subscribers:`Layanan subscribers ${p} untuk membantu pertumbuhan kanal dan membangun audiens.`,
+    members:`Layanan members ${p} untuk kebutuhan komunitas atau kanal yang memenuhi ketentuan platform.`,
+    saves:`Layanan saves ${p} untuk membantu meningkatkan sinyal penyimpanan konten.`,
+    reactions:`Layanan reactions ${p} untuk menambah interaksi pada postingan.`
+  };
+  return `${copy[t] || `Layanan ${type || "boosting"} ${p} dengan pengecekan order manual dan informasi paket transparan.`} Jumlah paket: ${qty}. Garansi refill: ${guarantee || "sesuai ketentuan paket"}.`;
+}
 function renderPackages(platform) {
   const grid = byId("packagesGrid");
   if (!grid) return;
-
-  const list = packages
-    .filter(p => p.platform === platform)
-    .sort((a, b) => (parseInt(a.qty, 10) || 0) - (parseInt(b.qty, 10) || 0));
-
-  grid.innerHTML = list.length ? list.map(p => `
-    <article class="price-card ${p.qty === "10K" ? "featured" : ""}">
-      ${p.qty === "10K" ? '<span class="popular">BEST VALUE</span>' : ""}
-      <span class="price-platform">${esc(platform.toUpperCase())}</span>
-      <h3>${esc(p.qty)} ${esc(p.type || "Followers")}</h3>
-      <div class="price">Rp ${money(p.price)}</div>
-      <div class="guarantee">Garansi ${esc(p.guarantee || "sesuai kesepakatan")}</div>
-      <button type="button" class="btn primary full order-package"
-        data-service="${esc(`${platform} ${p.qty} ${p.type || "Followers"} — Rp ${p.price}`)}">
-        Order Paket
-      </button>
-    </article>
-  `).join("") : '<p class="muted-note">Paket untuk platform ini belum tersedia. Silakan ajukan permintaan melalui formulir order; admin akan mengonfirmasi ketersediaan dan harga.</p>';
+  const list = packages.filter(p => String(p.platform || "").toLowerCase() === String(platform).toLowerCase())
+    .sort((a,b) => (parseInt(a.qty,10)||0)-(parseInt(b.qty,10)||0));
+  const order = ["Followers","Likes","Views","Comments","Shares","Subscribers","Members","Saves","Reactions"];
+  const groups = [...new Set(list.map(p => p.type || "Followers"))].sort((a,b) => (order.indexOf(a)<0?99:order.indexOf(a))-(order.indexOf(b)<0?99:order.indexOf(b)));
+  if (!list.length) {
+    grid.innerHTML = '<div class="boost-empty"><span>✦</span><h3>Paket sedang disiapkan</h3><p>Belum ada paket aktif untuk platform ini. Ajukan permintaan custom melalui formulir order; admin akan mengonfirmasi harga dan ketersediaan.</p></div>';
+    return;
+  }
+  grid.innerHTML = groups.map(type => `<section class="boost-type-group"><div class="boost-type-heading"><span class="boost-type-icon">${({Followers:"◎",Likes:"♥",Views:"▶",Comments:"✎",Shares:"↗",Subscribers:"✦",Members:"◈",Saves:"▣",Reactions:"✧"})[type]||"✦"}</span><div><h3>${esc(type)} ${esc(platform.toUpperCase())}</h3><p>Paket ${esc(type.toLowerCase())} dengan pengecekan order manual</p></div></div><div class="boost-package-grid">${list.filter(p => (p.type||"Followers")===type).map(p => {
+    const desc=p.description || describeBoost(platform,type,p.qty,p.guarantee);
+    const serviceName=`${platform} ${type} ${p.qty}`;
+    return `<article class="price-card premium-price-card"><div class="package-topline"><span class="price-platform">${esc(platform.toUpperCase())}</span><span class="package-status">● MANUAL CHECK</span></div><h4>${esc(p.qty)} ${esc(type)}</h4><p class="package-description">${esc(desc)}</p><div class="price">Rp ${money(p.price)}</div><div class="package-benefits"><span>✓ Garansi refill ${esc(p.guarantee||"sesuai kesepakatan")}</span><span>✓ Bantuan admin</span><span>✓ Konfirmasi sebelum proses</span></div><button type="button" class="btn primary full order-package" data-service="${esc(serviceName)}" data-description="${esc(desc)}" data-platform="${esc(platform)}" data-type="${esc(type)}" data-qty="${esc(p.qty)}">Pilih layanan <span>→</span></button></article>`;
+  }).join("")}</div></section>`).join("");
 }
 
 function applyMaintenance() {
@@ -332,6 +342,10 @@ document.addEventListener("click", event => {
   if (!select || !form) return;
 
   const requested = button.dataset.service || "";
+  const originalLabel = button.innerHTML;
+  button.disabled = true;
+  button.innerHTML = '<span class="button-spinner" aria-hidden="true"></span> Menyiapkan...';
+  window.setTimeout(() => { button.disabled = false; button.innerHTML = originalLabel; }, 900);
 
   if (![...select.options].some(option => option.value === requested)) {
     const option = document.createElement("option");
@@ -341,6 +355,10 @@ document.addEventListener("click", event => {
   }
 
   select.value = requested;
+  const detailsField = form.querySelector('[name="details"]');
+  if (detailsField && button.dataset.description) {
+    detailsField.value = `Platform: ${button.dataset.platform || ""}\nJenis layanan: ${button.dataset.type || ""}\nJumlah: ${button.dataset.qty || ""}\nDeskripsi: ${button.dataset.description}\nTautan akun/konten publik: `;
+  }
   location.hash = "order";
   form.scrollIntoView({ behavior: "smooth", block: "center" });
 });
@@ -540,9 +558,9 @@ if (orderForm) orderForm.addEventListener("submit", async event => {
   if(consent && !consent.checked){showOrderStatus("Centang persetujuan sebelum mengirim pesanan.");return;}
   const orderCode = `KN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
   const payload = { uid:null, name, phone, email, service, details, status:"new", paymentStatus:"awaiting_quote", price:0, paymentNote:"Menunggu admin mengonfirmasi total tagihan dan instruksi pembayaran.", orderCode, source:"guest-order-v5", createdAt:serverTimestamp() };
-  try { button.disabled=true; showOrderStatus("Mengirim pesanan..."); await addDoc(collection(db,"orders"),payload); showOrderStatus(`Pesanan berhasil dikirim. Simpan kode ${orderCode}. Admin akan menghubungi Anda.`,true); form.reset(); }
+  try { button.disabled=true; button.dataset.originalText=button.innerHTML; button.innerHTML='<span class="button-spinner" aria-hidden="true"></span> Mengirim pesanan...'; showOrderStatus("Mengirim pesanan..."); await addDoc(collection(db,"orders"),payload); showOrderStatus(`Pesanan berhasil dikirim. Simpan kode ${orderCode}. Admin akan menghubungi Anda.`,true); form.reset(); }
   catch(err){ console.error("Guest order failed",err); showOrderStatus(`Pesanan gagal dikirim (${err.code||err.message}). Hubungi admin melalui WhatsApp.`); }
-  finally {button.disabled=false;}
+  finally {button.disabled=false; if(button.dataset.originalText){button.innerHTML=button.dataset.originalText;delete button.dataset.originalText;}}
 });
 
 const ticketForm = byId("ticketForm");
@@ -588,3 +606,12 @@ function startVisualEffect(settings={}) {
   const tick=()=>{ctx.clearRect(0,0,w,h);const accent=settings.accent||"#79f2a0";items.forEach((p,i)=>{p.y+=p.v*(effect==="snow"?1.1:1);p.x+=effect==="snow"?Math.sin((p.y+i)*.006)*.35:effect==="particles"?Math.cos((p.y+i)*.01)*.3:0;if(p.y>h+8){p.y=-8;p.x=Math.random()*w;}if(effect==="matrix"){ctx.fillStyle=accent;ctx.globalAlpha=.16+p.z*.28;ctx.font=`${12*p.z*devicePixelRatio}px monospace`;ctx.fillText(Math.random()>.5?"1":"0",p.x,p.y);}else{ctx.globalAlpha=.15+p.z*.38;ctx.fillStyle=effect==="snow"?"#dff5ff":effect==="stars"?"#d7eaff":accent;ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.z*devicePixelRatio,0,Math.PI*2);ctx.fill();}});ctx.globalAlpha=1;fxFrame=requestAnimationFrame(tick);};
   tick();
 }
+
+// Tombol suka untuk contoh ulasan hanya tersimpan di tampilan browser, tanpa menulis Firestore.
+document.addEventListener("click", event => {
+  const button=event.target.closest(".review-like"); if(!button)return;
+  const active=button.getAttribute("aria-pressed")==="true";
+  const count=button.querySelector(".like-count");
+  if(count) count.textContent=String(Math.max(0,(Number(count.textContent)||0)+(active?-1:1)));
+  button.setAttribute("aria-pressed",String(!active)); button.classList.toggle("liked",!active);
+});
