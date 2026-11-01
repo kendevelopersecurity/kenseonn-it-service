@@ -1,0 +1,44 @@
+KENSEONN PREMIUM UPGRADE
+
+Perubahan utama:
+- Loading overlay nyata untuk pemilihan layanan dan pengiriman order; spinner tombol pada proses admin.
+- Paket boosting dikelompokkan per jenis layanan dan deskripsi paket dapat diatur dari admin.
+- Ulasan pelanggan dikelola melalui tab Ulasan & Like di admin. Tidak ada ulasan demo/fiktif yang dibuat otomatis.
+- Like ulasan disimpan ke Firestore dengan satu dokumen per UID pelanggan yang login; angka berasal dari dokumen like yang terbaca.
+- Design Lab diberi tampilan studio yang lebih rapi dan preview lebih jelas.
+- File versi utama dan nested V2.1 disinkronkan.
+
+PENTING SETELAH DEPLOY:
+1. Deploy firestore.rules yang sudah ditambahkan. Perubahan rules ini bersifat aditif: semua rules lama tetap dipertahankan.
+2. Aktifkan Firebase Authentication Email/Password dan pastikan pelanggan login untuk memberi like.
+3. Admin perlu memasukkan feedback pelanggan asli di tab Ulasan & Like. Tidak ada ulasan atau rating palsu.
+4. Boosting real/otomatis belum terhubung ke provider API. Untuk auto-delivery diperlukan API resmi penyedia layanan, dokumentasi endpoint, dan kredensial rahasia di backend/Cloud Functions. Jangan letakkan API key provider di app.js.
+5. Pembayaran masih manual; tidak ada gateway atau verifikasi otomatis.
+
+
+COMMAND CENTER UPGRADE (ADMIN)
+- Admin memiliki layout workspace/sidebar responsif dan navigasi modul yang jelas.
+- Customer directory memuat profil dari customers; admin dapat arsip/pulihkan profil. Aturan customer membatasi pelanggan ke dokumen UID miliknya.
+- Audit Log membaca catatan aktivitas persisten dari adminLogs.
+- Overview orders/services/packages dan daftar pesanan, layanan, paket menerima pembaruan realtime melalui Firestore onSnapshot selama sesi admin aktif.
+- Ulasan menampilkan hitungan like dari dokumen reviewLikes yang benar-benar ada, bukan angka demo.
+- Admin memerlukan deploy firestore.rules yang disertakan agar customer directory dan like bekerja sesuai izin.
+- Firebase Console wajib diuji setelah deploy; koneksi proyek nyata tidak dapat diverifikasi dari proses build lokal.
+
+
+FITUR KE-21: WEBSITE THEME & LAYOUT SWITCHER
+- Admin dapat memilih 6 layout: Cyber Dark, Modern SaaS, Premium Business, Glassmorphism, Tech Matrix, Editorial Showcase.
+- Preview layout tersedia di Design Lab sebelum diterapkan.
+- Saat menyimpan desain, konfigurasi sebelumnya disimpan di siteConfig/main.previousDesign.
+- Tombol Kembalikan tampilan sebelumnya menukar konfigurasi saat ini dengan riwayat sebelumnya.
+- Tombol Restore Default mengembalikan desain/layout awal Kenseonn dan menyimpan konfigurasi sebelumnya untuk pemulihan.
+- Website publik membaca siteConfig/main.design.layout saat loadData berjalan.
+- Perubahan tema memerlukan akses admin Firestore; rules admin yang sudah ada harus tetap mengizinkan write ke siteConfig/main.
+
+
+ENTERPRISE SUITE V22 (20 MODULES)
+- Added Enterprise Suite workspace to admin.html/admin.js/admin-premium.css.
+- 20 modules have admin-side record create/read/update/delete backed by Firestore enterpriseRecords.
+- New Firestore rule: enterpriseRecords read/write restricted to enabled admins.
+- Modules cover P&L, ledger, pricing, forecast, abandoned orders, live-chat records, loyalty, referrals, disputes, segmentation, provider registry/health/failover policy, tracking, refunds/refills, role matrix records, 2FA policy records, fraud cases, recovery logs, and performance incidents.
+- External payment/API/chat/push/2FA automation is not activated by storing a record; it requires verified credentials and server-side integration. Secrets must never be stored in Firestore client-readable documents.

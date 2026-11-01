@@ -28,8 +28,39 @@ service cloud.firestore {
     && request.resource.data.status == 'open';
    allow read,update,delete: if isAdmin();
   }
-  match /customers/{uid}{ allow read,write: if false; }
+  match /customers/{uid} {
+   allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+   allow create: if signedIn() && request.auth.uid == uid
+     && request.resource.data.keys().hasOnly(['name','email','emailVerified','createdAt','updatedAt'])
+     && request.resource.data.email == request.auth.token.email;
+   allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','emailVerified','updatedAt']));
+   allow delete: if isAdmin();
+  }
   match /adminLogs/{id}{ allow read,create: if isAdmin(); allow update,delete: if false; }
+
+  // Public reviews are curated by admins; customer likes are one-per-authenticated-UID.
+  match /reviews/{reviewId} {
+   allow read: if true;
+   allow create, update, delete: if isAdmin();
+  }
+  match /reviewLikes/{likeId} {
+   allow read: if true;
+   allow create: if signedIn()
+     && request.resource.data.keys().hasAll(['reviewId','uid','createdAt'])
+     && request.resource.data.uid == request.auth.uid
+     && request.resource.data.reviewId is string
+     && exists(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId))
+     && get(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId)).data.active == true
+     && likeId == request.resource.data.reviewId + '_' + request.auth.uid;
+   allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+   allow update: if false;
+  }
+  // Enterprise Command Suite: admin-managed operational records.
+  match /enterpriseRecords/{recordId} {
+    allow read, create, update, delete: if isAdmin();
+  }
+
   match /{document=**}{ allow read,write: if false; }
  }
 }

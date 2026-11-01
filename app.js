@@ -7,6 +7,7 @@ import {
   getDoc,
   addDoc,
   setDoc,
+  deleteDoc,
   query,
   serverTimestamp,
   where
@@ -91,6 +92,15 @@ function esc(value = "") {
   })[char]);
 }
 
+function setGlobalLoading(show, message = "Memproses permintaan...") {
+  const overlay = byId("globalLoading");
+  if (!overlay) return;
+  const label = byId("globalLoadingText");
+  if (label) label.textContent = message;
+  overlay.classList.toggle("hidden", !show);
+  document.body.classList.toggle("is-loading", show);
+}
+
 function showOrderStatus(message, success = false) {
   const el = byId("orderStatus");
   if (!el) return;
@@ -134,6 +144,7 @@ async function loadData() {
   }
 
   render();
+  renderReviews();
   applyDesign();
   const paymentBox = byId("paymentInstructions");
   if (paymentBox) {
@@ -227,36 +238,41 @@ function render() {
 }
 
 function describeBoost(platform, type, qty, guarantee) {
-  const p = String(platform || "").toUpperCase(), t = String(type || "Followers").toLowerCase();
-  const copy = {
-    followers:`Layanan penambahan followers ${p} untuk membantu memperkuat bukti sosial dan tampilan profil kreator maupun bisnis.`,
-    likes:`Layanan likes ${p} untuk mendukung interaksi pada konten pilihan. Pastikan tautan konten bersifat publik.`,
-    views:`Layanan views ${p} untuk membantu meningkatkan jumlah tayangan pada konten yang dipilih.`,
-    comments:`Layanan komentar ${p} untuk menambah variasi interaksi. Detail komentar dikonfirmasi admin sebelum proses.`,
-    shares:`Layanan shares ${p} untuk mendukung distribusi konten agar lebih mudah ditemukan audiens.`,
-    subscribers:`Layanan subscribers ${p} untuk membantu pertumbuhan kanal dan membangun audiens.`,
-    members:`Layanan members ${p} untuk kebutuhan komunitas atau kanal yang memenuhi ketentuan platform.`,
-    saves:`Layanan saves ${p} untuk membantu meningkatkan sinyal penyimpanan konten.`,
-    reactions:`Layanan reactions ${p} untuk menambah interaksi pada postingan.`
+  const key = String(type || "Followers").toLowerCase();
+  const templates = {
+    followers: `Paket followers ${platform} untuk membantu memperluas social proof profil dan mendukung pertumbuhan akun.`,
+    likes: `Paket likes ${platform} untuk mendukung interaksi pada konten publik yang kamu tentukan.`,
+    views: `Paket views ${platform} untuk mendukung jangkauan tayangan konten.`,
+    comments: `Paket komentar ${platform}; format dan ketentuan komentar wajib dikonfirmasi admin sebelum proses.`,
+    shares: `Paket shares ${platform} untuk membantu distribusi konten.`,
+    subscribers: `Paket subscribers ${platform} untuk mendukung pertumbuhan kanal.`,
+    members: `Paket members ${platform} untuk komunitas atau kanal yang sesuai ketentuan platform.`,
+    saves: `Paket saves ${platform} untuk mendukung interaksi simpan pada konten.`,
+    reactions: `Paket reactions ${platform} untuk mendukung interaksi pada postingan.`
   };
-  return `${copy[t] || `Layanan ${type || "boosting"} ${p} dengan pengecekan order manual dan informasi paket transparan.`} Jumlah paket: ${qty}. Garansi refill: ${guarantee || "sesuai ketentuan paket"}.`;
+  return `${templates[key] || `Paket ${type} ${platform} dengan verifikasi order manual.`} Jumlah: ${qty}. Ketentuan refill: ${guarantee || "lihat konfirmasi admin"}.`;
 }
+
 function renderPackages(platform) {
   const grid = byId("packagesGrid");
   if (!grid) return;
-  const list = packages.filter(p => String(p.platform || "").toLowerCase() === String(platform).toLowerCase())
-    .sort((a,b) => (parseInt(a.qty,10)||0)-(parseInt(b.qty,10)||0));
-  const order = ["Followers","Likes","Views","Comments","Shares","Subscribers","Members","Saves","Reactions"];
-  const groups = [...new Set(list.map(p => p.type || "Followers"))].sort((a,b) => (order.indexOf(a)<0?99:order.indexOf(a))-(order.indexOf(b)<0?99:order.indexOf(b)));
+  const list = packages
+    .filter(p => String(p.platform || "").toLowerCase() === String(platform || "").toLowerCase() && p.active !== false)
+    .sort((a,b) => (parseInt(a.qty,10)||0) - (parseInt(b.qty,10)||0));
   if (!list.length) {
-    grid.innerHTML = '<div class="boost-empty"><span>✦</span><h3>Paket sedang disiapkan</h3><p>Belum ada paket aktif untuk platform ini. Ajukan permintaan custom melalui formulir order; admin akan mengonfirmasi harga dan ketersediaan.</p></div>';
+    grid.innerHTML = '<div class="reviews-empty"><h3>Paket belum tersedia</h3><p>Admin belum menerbitkan paket aktif untuk platform ini. Tidak ada harga contoh yang ditampilkan.</p></div>';
     return;
   }
-  grid.innerHTML = groups.map(type => `<section class="boost-type-group"><div class="boost-type-heading"><span class="boost-type-icon">${({Followers:"◎",Likes:"♥",Views:"▶",Comments:"✎",Shares:"↗",Subscribers:"✦",Members:"◈",Saves:"▣",Reactions:"✧"})[type]||"✦"}</span><div><h3>${esc(type)} ${esc(platform.toUpperCase())}</h3><p>Paket ${esc(type.toLowerCase())} dengan pengecekan order manual</p></div></div><div class="boost-package-grid">${list.filter(p => (p.type||"Followers")===type).map(p => {
-    const desc=p.description || describeBoost(platform,type,p.qty,p.guarantee);
-    const serviceName=`${platform} ${type} ${p.qty}`;
-    return `<article class="price-card premium-price-card"><div class="package-topline"><span class="price-platform">${esc(platform.toUpperCase())}</span><span class="package-status">● MANUAL CHECK</span></div><h4>${esc(p.qty)} ${esc(type)}</h4><p class="package-description">${esc(desc)}</p><div class="price">Rp ${money(p.price)}</div><div class="package-benefits"><span>✓ Garansi refill ${esc(p.guarantee||"sesuai kesepakatan")}</span><span>✓ Bantuan admin</span><span>✓ Konfirmasi sebelum proses</span></div><button type="button" class="btn primary full order-package" data-service="${esc(serviceName)}" data-description="${esc(desc)}" data-platform="${esc(platform)}" data-type="${esc(type)}" data-qty="${esc(p.qty)}">Pilih layanan <span>→</span></button></article>`;
-  }).join("")}</div></section>`).join("");
+  const order = ["Followers","Likes","Views","Comments","Shares","Subscribers","Members","Saves","Reactions"];
+  const types = [...new Set(list.map(p => p.type || "Followers"))].sort((a,b) => (order.indexOf(a)<0?99:order.indexOf(a)) - (order.indexOf(b)<0?99:order.indexOf(b)));
+  grid.innerHTML = types.map(type => {
+    const cards = list.filter(p => (p.type || "Followers") === type).map(p => {
+      const desc = p.description || describeBoost(platform, type, p.qty, p.guarantee);
+      const serviceName = `${platform} ${type} ${p.qty}`;
+      return `<article class="price-card premium-price-card"><div class="package-topline"><span class="price-platform">${esc(String(platform).toUpperCase())}</span><span class="package-status">● ADMIN VERIFIED</span></div><h4>${esc(p.qty)} ${esc(type)}</h4><p class="package-description">${esc(desc)}</p><div class="price">Rp ${money(p.price)}</div><div class="package-benefits"><span>✓ Garansi: ${esc(p.guarantee || "sesuai konfirmasi")}</span><span>✓ Konfirmasi admin sebelum bayar</span><span>✓ Bantuan jika ada kendala</span></div><button type="button" class="btn primary full order-package" data-service="${esc(serviceName)}" data-description="${esc(desc)}" data-platform="${esc(platform)}" data-type="${esc(type)}" data-qty="${esc(p.qty)}">Pilih paket →</button></article>`;
+    }).join("");
+    return `<section class="boost-type-group"><div class="boost-type-heading"><span class="boost-type-icon">${({Followers:"◎",Likes:"♥",Views:"▶",Comments:"✎",Shares:"↗",Subscribers:"✦",Members:"◈",Saves:"▣",Reactions:"✧"})[type] || "✦"}</span><div><h3>${esc(type)} ${esc(String(platform).toUpperCase())}</h3><p>Pilih jumlah dan ketentuan paket yang tersedia</p></div></div><div class="boost-package-grid">${cards}</div></section>`;
+  }).join("");
 }
 
 function applyMaintenance() {
@@ -342,10 +358,11 @@ document.addEventListener("click", event => {
   if (!select || !form) return;
 
   const requested = button.dataset.service || "";
-  const originalLabel = button.innerHTML;
+  setGlobalLoading(true, "Menyiapkan detail layanan...");
   button.disabled = true;
-  button.innerHTML = '<span class="button-spinner" aria-hidden="true"></span> Menyiapkan...';
-  window.setTimeout(() => { button.disabled = false; button.innerHTML = originalLabel; }, 900);
+  const idleLabel = button.innerHTML;
+  button.innerHTML = '<span class="button-spinner"></span> Menyiapkan...';
+  window.setTimeout(() => { button.disabled = false; button.innerHTML = idleLabel; setGlobalLoading(false); }, 650);
 
   if (![...select.options].some(option => option.value === requested)) {
     const option = document.createElement("option");
@@ -356,9 +373,7 @@ document.addEventListener("click", event => {
 
   select.value = requested;
   const detailsField = form.querySelector('[name="details"]');
-  if (detailsField && button.dataset.description) {
-    detailsField.value = `Platform: ${button.dataset.platform || ""}\nJenis layanan: ${button.dataset.type || ""}\nJumlah: ${button.dataset.qty || ""}\nDeskripsi: ${button.dataset.description}\nTautan akun/konten publik: `;
-  }
+  if (detailsField && button.dataset.description) detailsField.value = `Platform: ${button.dataset.platform || ""}\nJenis layanan: ${button.dataset.type || ""}\nJumlah: ${button.dataset.qty || ""}\nDeskripsi: ${button.dataset.description}\nTautan publik akun/konten: `;
   location.hash = "order";
   form.scrollIntoView({ behavior: "smooth", block: "center" });
 });
@@ -385,6 +400,7 @@ onAuthStateChanged(auth, async authUser => {
       currentCustomer = null;
       if (authGuest) authGuest.classList.remove("hidden");
       if (customerDashboard) customerDashboard.classList.add("hidden");
+      renderReviews();
       const emailField = document.querySelector('#orderForm [name="email"]');
       if (emailField) emailField.readOnly = false;
       return;
@@ -408,6 +424,7 @@ onAuthStateChanged(auth, async authUser => {
     const nameField = document.querySelector('#orderForm [name="name"]');
     if (nameField && user.displayName && !nameField.value) nameField.value = user.displayName;
     await refreshCustomerOrders();
+    renderReviews();
   } catch (err) {
     console.error("Customer session/dashboard error:", err);
     setText("customerLoginStatus", `Sesi masuk terdeteksi, tetapi dashboard gagal dimuat: ${err.code || err.message}`);
@@ -558,9 +575,9 @@ if (orderForm) orderForm.addEventListener("submit", async event => {
   if(consent && !consent.checked){showOrderStatus("Centang persetujuan sebelum mengirim pesanan.");return;}
   const orderCode = `KN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
   const payload = { uid:null, name, phone, email, service, details, status:"new", paymentStatus:"awaiting_quote", price:0, paymentNote:"Menunggu admin mengonfirmasi total tagihan dan instruksi pembayaran.", orderCode, source:"guest-order-v5", createdAt:serverTimestamp() };
-  try { button.disabled=true; button.dataset.originalText=button.innerHTML; button.innerHTML='<span class="button-spinner" aria-hidden="true"></span> Mengirim pesanan...'; showOrderStatus("Mengirim pesanan..."); await addDoc(collection(db,"orders"),payload); showOrderStatus(`Pesanan berhasil dikirim. Simpan kode ${orderCode}. Admin akan menghubungi Anda.`,true); form.reset(); }
+  try { button.disabled=true; setGlobalLoading(true, "Mengirim pesanan ke database..."); button.dataset.idleHtml=button.innerHTML; button.innerHTML='<span class="button-spinner"></span> Mengirim...'; showOrderStatus("Mengirim pesanan..."); await addDoc(collection(db,"orders"),payload); showOrderStatus(`Pesanan berhasil dikirim. Simpan kode ${orderCode}. Admin akan menghubungi Anda.`,true); form.reset(); }
   catch(err){ console.error("Guest order failed",err); showOrderStatus(`Pesanan gagal dikirim (${err.code||err.message}). Hubungi admin melalui WhatsApp.`); }
-  finally {button.disabled=false; if(button.dataset.originalText){button.innerHTML=button.dataset.originalText;delete button.dataset.originalText;}}
+  finally {button.disabled=false; setGlobalLoading(false); if(button.dataset.idleHtml){button.innerHTML=button.dataset.idleHtml;delete button.dataset.idleHtml;}}
 });
 
 const ticketForm = byId("ticketForm");
@@ -568,8 +585,8 @@ if(ticketForm) ticketForm.addEventListener("submit", async event=>{
   event.preventDefault(); const form=event.currentTarget, button=form.querySelector('[type="submit"]'); if(!form.reportValidity()||button.disabled)return;
   const f=new FormData(form); const ticketCode=`KT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
   const data={ticketCode,name:String(f.get('name')||'').trim(),email:String(f.get('email')||'').trim().toLowerCase(),phone:String(f.get('phone')||'').trim(),category:String(f.get('category')||'Perlu bantuan'),message:String(f.get('message')||'').trim(),status:'open',createdAt:serverTimestamp(),source:'public-helpdesk-v5'};
-  try{button.disabled=true;byId('ticketStatus').textContent='Mengirim tiket...';await addDoc(collection(db,'supportTickets'),data);byId('ticketStatus').textContent=`Tiket terkirim. Simpan kode ${ticketCode}; admin akan menghubungi kontak Anda.`;form.reset();}
-  catch(err){console.error(err);byId('ticketStatus').textContent=`Tiket gagal dikirim (${err.code||err.message}).`;}finally{button.disabled=false;}
+  try{button.disabled=true;button.dataset.idleHtml=button.innerHTML;button.innerHTML='<span class="button-spinner"></span> Mengirim...';setGlobalLoading(true,"Mengirim tiket bantuan...");byId('ticketStatus').textContent='Mengirim tiket...';await addDoc(collection(db,'supportTickets'),data);byId('ticketStatus').textContent=`Tiket terkirim. Simpan kode ${ticketCode}; admin akan menghubungi kontak Anda.`;form.reset();}
+  catch(err){console.error(err);byId('ticketStatus').textContent=`Tiket gagal dikirim (${err.code||err.message}).`;}finally{button.disabled=false;setGlobalLoading(false);if(button.dataset.idleHtml){button.innerHTML=button.dataset.idleHtml;delete button.dataset.idleHtml;}}
 });
 
 loadData();
@@ -578,6 +595,8 @@ loadData();
 // VISUAL ENGINE: matrix rain, starfield, snowfall and particles (reduced-motion aware).
 function applyDesign() {
   const d = site.design || {};
+  const allowedLayouts = ["cyber", "saas", "business", "glass", "matrix", "editorial"];
+  document.body.dataset.siteLayout = allowedLayouts.includes(d.layout) ? d.layout : "cyber";
   const themes = {matrix:["#79f2a0","#58d9ff","#070b10"],aurora:["#8be7ff","#b9a4ff","#07101a"],violet:["#c69aff","#64dcff","#0c0715"],ember:["#ff9a67","#ffd36e","#100a08"],mono:["#d5e0eb","#91a2b5","#080b0f"]};
   const palette = themes[d.theme] || themes.matrix;
   const accent = d.accent || palette[0], accent2 = d.accent2 || palette[1];
@@ -607,11 +626,49 @@ function startVisualEffect(settings={}) {
   tick();
 }
 
-// Tombol suka untuk contoh ulasan hanya tersimpan di tampilan browser, tanpa menulis Firestore.
-document.addEventListener("click", event => {
-  const button=event.target.closest(".review-like"); if(!button)return;
-  const active=button.getAttribute("aria-pressed")==="true";
-  const count=button.querySelector(".like-count");
-  if(count) count.textContent=String(Math.max(0,(Number(count.textContent)||0)+(active?-1:1)));
-  button.setAttribute("aria-pressed",String(!active)); button.classList.toggle("liked",!active);
+// Ulasan asli dari Firestore. Like memakai dokumen unik per UID, bukan angka demo/local.
+async function renderReviews() {
+  const grid = byId("reviewsGrid");
+  if (!grid) return;
+  grid.innerHTML = '<div class="review-loading"><span class="inline-spinner"></span> Mengambil ulasan dari database...</div>';
+  try {
+    const snap = await getDocs(query(collection(db, "reviews"), where("active", "==", true)));
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    if (!rows.length) {
+      grid.innerHTML = '<div class="reviews-empty"><span>✦</span><h3>Belum ada ulasan terverifikasi</h3><p>Ulasan akan muncul setelah admin memasukkan feedback pelanggan yang benar-benar diterima.</p></div>';
+      return;
+    }
+    const user = currentCustomer;
+    const cards = await Promise.all(rows.map(async review => {
+      const likesSnap = await getDocs(query(collection(db, "reviewLikes"), where("reviewId", "==", review.id)));
+      let liked = false;
+      if (user) liked = (await getDoc(doc(db, "reviewLikes", `${review.id}_${user.uid}`))).exists();
+      const rating = Math.max(1, Math.min(5, Number(review.rating) || 5));
+      return `<article class="review-card"><div class="review-card-top"><span class="review-avatar">${esc((review.customerName || "P").trim().charAt(0).toUpperCase())}</span><div><b>${esc(review.customerName || "Pelanggan")}</b><small>${esc(review.platform || "Layanan Kenseonn")}</small></div><span class="review-verified">✓ Dikelola admin</span></div><div class="review-stars" aria-label="Rating ${rating} dari 5">${"★".repeat(rating)}${"☆".repeat(5-rating)}</div><p>${esc(review.message || "")}</p><button class="review-like ${liked ? "liked" : ""}" type="button" data-review-id="${esc(review.id)}" aria-pressed="${liked}"><span>♥</span> Suka <b class="like-count">${likesSnap.size}</b></button></article>`;
+    }));
+    grid.innerHTML = cards.join("");
+  } catch (error) {
+    console.error("Gagal memuat ulasan:", error);
+    grid.innerHTML = `<div class="reviews-empty"><h3>Ulasan belum dapat dimuat</h3><p>${esc(error.code || "Periksa koneksi dan Firestore Rules")}</p></div>`;
+  }
+}
+
+document.addEventListener("click", async event => {
+  const button = event.target.closest(".review-like");
+  if (!button || button.disabled) return;
+  if (!currentCustomer) { showOrderStatus("Silakan login sebagai pelanggan untuk menyukai ulasan."); location.hash = "account"; return; }
+  const reviewId = button.dataset.reviewId;
+  if (!reviewId) return;
+  const likeRef = doc(db, "reviewLikes", `${reviewId}_${currentCustomer.uid}`);
+  const liked = button.getAttribute("aria-pressed") === "true";
+  button.disabled = true; button.innerHTML = '<span class="inline-spinner"></span> Menyimpan...';
+  try {
+    if (liked) await deleteDoc(likeRef);
+    else await setDoc(likeRef, { reviewId, uid: currentCustomer.uid, createdAt: serverTimestamp() });
+    await renderReviews();
+  } catch (error) {
+    console.error("Gagal memperbarui like:", error);
+    showOrderStatus(`Like gagal disimpan: ${error.code || error.message}`);
+    button.disabled = false;
+  }
 });

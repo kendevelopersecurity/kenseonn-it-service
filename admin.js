@@ -35,7 +35,8 @@ import {
   deleteDoc,
   serverTimestamp,
   orderBy,
-  query
+  query,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 import { firebaseConfig } from "./firebase-config.js";
@@ -53,6 +54,10 @@ let orders = [];
 let busy = false;
 let customers = [];
 let supportTickets = [];
+let reviews = [];
+let reviewLikeCounts = {};
+let adminLogs = [];
+let liveUnsubscribers = [];
 const adminLoginCooldownKey = "kenseonn_admin_login_until";
 
 const defaultServices = [
@@ -113,7 +118,14 @@ function showError(action, error) {
 
 function setBusy(button, value) {
   if (!button) return;
-  button.disabled = value;
+  if (value) {
+    if (!button.dataset.idleHtml) button.dataset.idleHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="button-spinner" aria-hidden="true"></span> Memproses...';
+  } else {
+    button.disabled = false;
+    if (button.dataset.idleHtml) { button.innerHTML = button.dataset.idleHtml; delete button.dataset.idleHtml; }
+  }
 }
 
 function getFormValue(form, name) {
@@ -125,6 +137,7 @@ function getFormValue(form, name) {
 
 onAuthStateChanged(auth, async user => {
   if (!user) {
+    liveUnsubscribers.forEach(fn=>{try{fn();}catch{}}); liveUnsubscribers=[];
     $("loginView")?.classList.remove("hidden");
     $("dashboard")?.classList.add("hidden");
     return;
@@ -252,7 +265,8 @@ async function refreshAll() {
       loadServices(),
       loadPackages(),
       loadOrders(),
-      loadTickets()
+      loadTickets(),
+      loadReviews()
     ]);
 
     showStatus("siteStatus", "Data berhasil dimuat ✓");
@@ -373,6 +387,23 @@ $("ticketsAdminList")?.addEventListener("click", async event => {
   } catch (error) { alert(showError("Gagal menyimpan balasan tiket", error)); }
   finally { button.disabled = false; }
 });
+
+async function loadReviews() {
+  const [snap, likesSnap] = await Promise.all([
+    getDocs(query(collection(db, "reviews"), orderBy("createdAt", "desc"))),
+    getDocs(collection(db, "reviewLikes"))
+  ]);
+  reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  reviewLikeCounts = {};
+  likesSnap.docs.forEach(like => { const rid = like.data().reviewId; if (rid) reviewLikeCounts[rid] = (reviewLikeCounts[rid] || 0) + 1; });
+  renderReviewsAdmin();
+}
+
+function renderReviewsAdmin() {
+  const host = $("reviewsAdminList");
+  if (!host) return;
+  host.innerHTML = reviews.map(item => `<div class="admin-row"><div><b>${esc(item.customerName || "Pelanggan")} · ${"★".repeat(Math.max(1,Math.min(5,Number(item.rating)||5)))}</b><small>${esc(item.platform || "")} · ${esc(item.message || "")}</small><small>Status: ${item.active === false ? "Disembunyikan" : "Tampil"} · ♥ ${reviewLikeCounts[item.id] || 0} like nyata</small></div><button class="btn small edit-review" type="button" data-id="${esc(item.id)}">Edit</button><button class="btn small danger delete-review" type="button" data-id="${esc(item.id)}">Hapus</button></div>`).join("") || '<p class="muted-note">Belum ada ulasan. Tambahkan feedback pelanggan asli di atas.</p>';
+}
 
 async function loadCustomers() {
   const snapshot = await getDocs(collection(db, "customers"));
@@ -499,7 +530,8 @@ $("packageForm")?.addEventListener("submit", async event => {
     type: String(fields.get("type") || "Followers").trim(),
     qty: String(fields.get("qty") || "").trim().toUpperCase(),
     price: Number(fields.get("price")),
-    guarantee: String(fields.get("guarantee") || "").trim()
+    guarantee: String(fields.get("guarantee") || "").trim(),
+    description: String(fields.get("description") || "").trim()
   };
 
   if (
@@ -744,6 +776,35 @@ $("refreshOrders")?.addEventListener("click", async () => {
 });
 
 
+// REVIEW MANAGEMENT — actual Firestore documents, no demo records.
+$("reviewForm")?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const form = event.currentTarget, button = form.querySelector('[type="submit"]'), f = new FormData(form), id = String(f.get("id") || "").trim();
+  const data = { customerName: String(f.get("customerName") || "").trim(), platform: String(f.get("platform") || "").trim(), rating: Number(f.get("rating") || 5), message: String(f.get("message") || "").trim(), active: f.get("active") === "on", updatedAt: serverTimestamp() };
+  if (data.customerName.length < 2 || data.message.length < 5 || data.rating < 1 || data.rating > 5) { showStatus("reviewStatus", "Periksa nama, isi ulasan, dan rating."); return; }
+  setBusy(button, true);
+  try {
+    if (id) await updateDoc(doc(db, "reviews", id), data);
+    else await addDoc(collection(db, "reviews"), { ...data, createdAt: serverTimestamp() });
+    form.reset(); getFormValue(form, "id").value = ""; getFormValue(form, "active").checked = true;
+    await loadReviews(); showStatus("reviewStatus", "Ulasan tersimpan di Firestore."); logActivity("Mengelola ulasan pelanggan");
+  } catch (error) { showStatus("reviewStatus", showError("Gagal menyimpan ulasan", error)); }
+  finally { setBusy(button, false); }
+});
+$("reviewCancel")?.addEventListener("click", () => { const f = $("reviewForm"); f?.reset(); if (f) { getFormValue(f,"id").value=""; getFormValue(f,"active").checked=true; } });
+$("refreshReviews")?.addEventListener("click", async () => { try { await loadReviews(); showStatus("reviewStatus", "Ulasan diperbarui."); } catch(e) { showStatus("reviewStatus", showError("Gagal memuat ulasan",e)); } });
+$("reviewsAdminList")?.addEventListener("click", async event => {
+  const button = event.target.closest("button[data-id]"); if (!button) return;
+  const item = reviews.find(r => r.id === button.dataset.id); if (!item) return;
+  if (button.classList.contains("edit-review")) {
+    const f = $("reviewForm"); getFormValue(f,"id").value=item.id; getFormValue(f,"customerName").value=item.customerName||""; getFormValue(f,"platform").value=item.platform||""; getFormValue(f,"rating").value=String(item.rating||5); getFormValue(f,"message").value=item.message||""; getFormValue(f,"active").checked=item.active!==false; f.scrollIntoView({behavior:"smooth",block:"center"});
+  }
+  if (button.classList.contains("delete-review") && confirm("Hapus ulasan ini? Data like terkait tidak ikut dihapus.")) {
+    try { button.disabled=true; await deleteDoc(doc(db,"reviews",item.id)); await loadReviews(); showStatus("reviewStatus","Ulasan dihapus. Like lama tetap berada di database untuk audit."); }
+    catch(error) { showStatus("reviewStatus",showError("Gagal menghapus ulasan",error)); button.disabled=false; }
+  }
+});
+
 // FINAL ULTIMATE 50: design controls, diagnostics, reports and operational helpers.
 const capabilityNames = [
 "Admin login Firebase","Pemeriksaan UID admin","Dashboard ringkasan","Penghitungan pesanan","Penghitungan layanan","Penghitungan paket","Ringkasan pesanan baru","Ringkasan pesanan selesai","Ringkasan nilai pesanan","Edit profil brand","Edit judul hero","Edit deskripsi hero","Edit email kontak","Edit Instagram","Edit WhatsApp","Maintenance mode","Maintenance countdown","CRUD katalog IT","Aktif/nonaktif layanan","CRUD paket boosting","Edit platform boosting","Edit kuantitas paket","Edit harga paket","Edit garansi paket","Daftar order Firebase","Ubah status order","Pencarian order","Filter status order","Refresh order","Tetapkan nominal tagihan","Ubah status pembayaran","Tulis instruksi pembayaran","Export CSV order","Kode order unik sisi browser","Matrix Rain","Starfield","Snowfall","Cyber particles","Preset tema","Warna aksen","Kontrol kecepatan efek","Kontrol kepadatan efek","Kontrol glow","Toggle scanline","Toggle grid","Toggle motion","Edit monogram","Analytics status","Layanan populer","Rasio penyelesaian","Monitor halaman dari browser","Tes baca Firestore","Backup JSON katalog","Restore konfigurasi situs","Export katalog CSV","Activity log sesi lokal","Layout responsif admin","Dashboard akun pelanggan","Registrasi pelanggan","Login pelanggan","Logout pelanggan","Daftar pesanan milik akun","Refresh riwayat pelanggan","Pemesanan dengan akun","Penyimpanan UID pelanggan","Validasi nomor WhatsApp","Validasi detail pesanan","Persetujuan kepemilikan/izin","Status menunggu penawaran","Status menunggu pembayaran","Status pembayaran lunas","Catatan pembayaran per order","Tagihan per order","Instruksi transfer per order","Katalog layanan IT","Katalog paket sosial","Tautan order dari kartu layanan","Tautan order dari kartu paket","FAQ layanan","Kontak email","Kontak WhatsApp","Kontak Instagram","Halaman maintenance","Pengaturan pembayaran manual","Proteksi data pelanggan per UID","Akses baca order oleh admin","Akses update order oleh admin","Akses CRUD katalog oleh admin","Aturan catch-all deny","Tidak meminta password akun sosial","Peringatan jangan kirim OTP","Peringatan scope security berizin","Riwayat status pesanan","Pencarian nama pelanggan","Pencarian nomor pelanggan","Pencarian kode order","Pencarian detail order","Ekspor data pesanan","Ekspor katalog layanan","Timestamp pembaruan order"
@@ -764,14 +825,21 @@ function logActivity(message){
 }
 function navigatePane(id){document.querySelectorAll(".admin-tab").forEach(t=>t.classList.toggle("active",t.dataset.pane===id));document.querySelectorAll(".admin-pane").forEach(p=>p.classList.toggle("hidden",p.id!==id));}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-jump]");if(b){navigatePane(b.dataset.jump);$(b.dataset.jump)?.scrollIntoView({behavior:"smooth",block:"start"});}});
-function fillDesignForm(data={}){const f=$("designForm");if(!f)return;for(const [k,v] of Object.entries({theme:"matrix",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//",...data})){const el=f.elements.namedItem(k);if(el){if(el.type==="checkbox")el.checked=v===true;else el.value=v??"";}}$("speedOutput").textContent=f.elements.speed.value;$("densityOutput").textContent=f.elements.density.value;}
-const designDefaults={theme:"matrix",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//"};
+function fillDesignForm(data={}){const f=$("designForm");if(!f)return;for(const [k,v] of Object.entries({theme:"matrix",layout:"cyber",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//",...data})){const el=f.elements.namedItem(k);if(el){if(el.type==="checkbox")el.checked=v===true;else el.value=v??"";}}$("speedOutput").textContent=f.elements.speed.value;$("densityOutput").textContent=f.elements.density.value;}
+const designDefaults={theme:"matrix",layout:"cyber",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//"};
 const originalRefreshAll=refreshAll;
 // Load saved visual config after the existing site document has been loaded.
 const _refreshAllUltimate=refreshAll;
 // Wrap refresh in a microtask to keep the original Firebase loading path intact.
 setTimeout(async()=>{try{const snap=await getDoc(doc(db,"siteConfig","main"));if(snap.exists())fillDesignForm({...designDefaults,...(snap.data().design||{})});else fillDesignForm();}catch(e){console.warn("Design settings load:",e);fillDesignForm();}},1200);
-$("designForm")?.addEventListener("submit",async e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('[type="submit"]');const d={};for(const key of Object.keys(designDefaults)){const el=f.elements.namedItem(key);d[key]=el?.type==="checkbox"?el.checked:el?.type==="range"?Number(el.value):el?.value;}btn.disabled=true;showStatus("designStatus","Menyimpan desain...");try{await setDoc(doc(db,"siteConfig","main"),{design:d},{merge:true});showStatus("designStatus","Desain tersimpan. Website menerapkan saat dimuat ulang.");logActivity("Memperbarui Design Lab");}catch(err){showStatus("designStatus",showError("Gagal menyimpan desain",err));}finally{btn.disabled=false;}});
+async function readCurrentDesign(){const snap=await getDoc(doc(db,"siteConfig","main"));return snap.exists()?(snap.data().design||{}):{};}
+function collectDesignForm(){const f=$("designForm"),d={};for(const key of Object.keys(designDefaults)){const el=f?.elements.namedItem(key);d[key]=el?.type==="checkbox"?el.checked:el?.type==="range"?Number(el.value):el?.value;}return d;}
+function previewSelectedLayout(){const layout=$("designForm")?.elements.namedItem("layout")?.value||"cyber";const preview=$("layoutPreview");if(preview)preview.dataset.layout=layout;}
+$("designForm")?.elements.namedItem("layout")?.addEventListener("change",previewSelectedLayout);
+$("previewLayout")?.addEventListener("click",()=>{previewSelectedLayout();showStatus("designStatus","Preview layout diperbarui. Belum diterapkan ke website publik.");});
+$("designForm")?.addEventListener("submit",async e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('[type="submit"]'),d=collectDesignForm();btn.disabled=true;showStatus("designStatus","Menyimpan desain dan riwayat sebelumnya...");try{const ref=doc(db,"siteConfig","main"),snap=await getDoc(ref),old=snap.exists()?(snap.data().design||{}):{};await setDoc(ref,{design:d,previousDesign:Object.keys(old).length?old:designDefaults},{merge:true});showStatus("designStatus","Layout dan desain berhasil disimpan. Website publik menerapkannya saat dimuat ulang.");previewSelectedLayout();logActivity("Mengubah tema dan layout website");}catch(err){showStatus("designStatus",showError("Gagal menyimpan desain",err));}finally{btn.disabled=false;}});
+$("restorePreviousLayout")?.addEventListener("click",async()=>{const b=$("restorePreviousLayout");b.disabled=true;showStatus("designStatus","Mengambil tampilan sebelumnya...");try{const ref=doc(db,"siteConfig","main"),snap=await getDoc(ref),data=snap.exists()?snap.data():{},previous=data.previousDesign;if(!previous||typeof previous!=="object")throw new Error("Belum ada riwayat tampilan sebelumnya. Simpan perubahan tema terlebih dahulu.");const current=data.design||designDefaults;await setDoc(ref,{design:previous,previousDesign:current},{merge:true});fillDesignForm({...designDefaults,...previous});previewSelectedLayout();showStatus("designStatus","Tampilan sebelumnya berhasil dipulihkan. Muat ulang website publik untuk melihat hasilnya.");logActivity("Memulihkan tampilan website sebelumnya");}catch(err){showStatus("designStatus",showError("Gagal memulihkan tampilan",err));}finally{b.disabled=false;}});
+$("restoreDefaultLayout")?.addEventListener("click",async()=>{if(!confirm("Kembalikan tema dan layout website ke desain awal Kenseonn?"))return;const b=$("restoreDefaultLayout");b.disabled=true;showStatus("designStatus","Mengembalikan desain awal...");try{const ref=doc(db,"siteConfig","main"),snap=await getDoc(ref),data=snap.exists()?snap.data():{},current=data.design||designDefaults,defaults={...designDefaults};await setDoc(ref,{design:defaults,previousDesign:current},{merge:true});fillDesignForm(defaults);previewSelectedLayout();showStatus("designStatus","Desain awal berhasil dipulihkan. Muat ulang website publik untuk menerapkannya.");logActivity("Restore default website layout");}catch(err){showStatus("designStatus",showError("Restore default gagal",err));}finally{b.disabled=false;}});
 ["speed","density"].forEach(k=>$("designForm")?.elements.namedItem(k)?.addEventListener("input",e=>{$(k+"Output").textContent=e.target.value;}));
 $("previewEffect")?.addEventListener("click",()=>{const f=$("designForm"),box=$("effectPreview");box.dataset.effect=f.elements.effect.value;box.style.setProperty("--preview-accent",f.elements.accent.value);box.querySelector("span").textContent=`PREVIEW: ${f.elements.effect.value.toUpperCase()} • SPEED ${f.elements.speed.value}`;logActivity("Menjalankan preview efek lokal");});
 function csvDownload(name,rows){const csv=rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
@@ -811,6 +879,31 @@ loadServices=async function(){await _loadServicesUltimate();};
 const _loadPackagesUltimate=loadPackages;
 loadPackages=async function(){await _loadPackagesUltimate();};
 
+
+// LIVE ADMIN DATA + PERSISTENT AUDIT LOGS
+async function loadAdminLogs(){
+  const snap = await getDocs(query(collection(db,"adminLogs"), orderBy("createdAt","desc")));
+  adminLogs = snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderAdminLogs();
+}
+function renderAdminLogs(){
+  const host=$("adminLogsList"); if(!host)return;
+  host.innerHTML=adminLogs.slice(0,100).map(item=>`<article class="audit-log-row"><div><b>${esc(item.action||"Aktivitas admin")}</b><small>${esc(item.email||item.uid||"Admin")} · ${esc(item.uid||"")}</small></div><small>${esc(dateValue(item.createdAt)||"Waktu tidak tersedia")}</small></article>`).join("") || '<p class="muted-note">Belum ada catatan aktivitas tersimpan.</p>';
+}
+$("refreshAdminLogs")?.addEventListener("click",async()=>{const b=$("refreshAdminLogs");setBusy(b,true);try{await loadAdminLogs();}catch(e){alert(showError("Gagal memuat audit log",e));}finally{setBusy(b,false);}});
+function startLiveAdminFeeds(){
+  liveUnsubscribers.forEach(fn=>{try{fn();}catch{}}); liveUnsubscribers=[];
+  if(!auth.currentUser)return;
+  const feed=(path,callback)=>{const unsub=onSnapshot(collection(db,path),snap=>callback(snap),err=>console.warn(`Live ${path}:`,err.code||err.message));liveUnsubscribers.push(unsub);};
+  // Real-time listener only for admin-readable collections; no writes are performed here.
+  feed("orders",snap=>{orders=snap.docs.map(d=>({id:d.id,...d.data()}));renderOrderTools();renderAnalytics();});
+  feed("services",snap=>{services=snap.docs.map(d=>({id:d.id,...d.data()}));showStatus("statServices",services.length);renderServices();});
+  feed("packages",snap=>{packages=snap.docs.map(d=>({id:d.id,...d.data()}));showStatus("statPackages",packages.length);renderPackages();});
+  feed("supportTickets",snap=>{supportTickets=snap.docs.map(d=>({id:d.id,...d.data()}));renderTickets();});
+  feed("reviews",snap=>{reviews=snap.docs.map(d=>({id:d.id,...d.data()}));renderReviewsAdmin();});
+  feed("reviewLikes",snap=>{reviewLikeCounts={};snap.docs.forEach(d=>{const rid=d.data().reviewId;if(rid)reviewLikeCounts[rid]=(reviewLikeCounts[rid]||0)+1;});renderReviewsAdmin();});
+  feed("adminLogs",snap=>{adminLogs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{const av=a.createdAt?.toMillis?.()||0,bv=b.createdAt?.toMillis?.()||0;return bv-av;});renderAdminLogs();});
+}
 
 // DIAGNOSTIK FRONT-END: pemeriksaan runtime ringan, bukan pemindai keamanan server.
 $("runDiagnostics")?.addEventListener("click", async () => {
@@ -864,4 +957,78 @@ $("designForm")?.elements.namedItem("theme")?.addEventListener("change",e=>{
  const f=$("designForm"); Object.entries(preset).forEach(([k,v])=>{const el=f.elements.namedItem(k);if(el){if(el.type==="checkbox")el.checked=v;else el.value=v;}});
  $("previewEffect")?.click();
 });
-refreshAll=async function(){await _refreshAllUltimate();try{await loadFeatureManager();}catch(e){console.warn("Feature Manager load:",e);}}
+refreshAll=async function(){
+  await _refreshAllUltimate();
+  const tasks = await Promise.allSettled([loadFeatureManager(), loadCustomers(), loadAdminLogs()]);
+  tasks.forEach((result, index) => { if (result.status === "rejected") console.warn(["Feature Manager","Customer directory","Audit log"][index], result.reason); });
+  startLiveAdminFeeds();
+}
+
+
+// ENTERPRISE COMMAND SUITE — 20 admin-managed modules backed by Firestore records.
+const enterpriseModules = [
+ {id:'profit-loss',name:'Profit & Loss Center',desc:'Ringkasan laba/rugi berbasis order dan catatan biaya.',kind:'Finance'},
+ {id:'financial-ledger',name:'Financial Ledger',desc:'Catat pemasukan dan pengeluaran bisnis.',kind:'Finance'},
+ {id:'smart-pricing',name:'Smart Pricing Engine',desc:'Simpan aturan harga, modal, margin, dan harga jual.',kind:'Commerce'},
+ {id:'sales-forecast',name:'Sales Forecast',desc:'Catat target dan proyeksi penjualan; bukan prediksi otomatis tanpa data historis.',kind:'Analytics'},
+ {id:'abandoned-orders',name:'Abandoned Order Recovery',desc:'Daftar order yang perlu ditindaklanjuti dan status follow-up.',kind:'Customer'},
+ {id:'live-chat',name:'Live Chat Center',desc:'Inbox/catatan percakapan support. Chat realtime publik butuh widget dan kanal pelanggan.',kind:'Customer'},
+ {id:'loyalty',name:'Customer Loyalty',desc:'Kelola level, poin, dan penyesuaian reward pelanggan.',kind:'Customer'},
+ {id:'referrals',name:'Referral Program',desc:'Kelola kode referral dan reward yang telah diverifikasi.',kind:'Marketing'},
+ {id:'disputes',name:'Complaint & Dispute Center',desc:'Catat komplain, bukti, penanggung jawab, dan penyelesaian.',kind:'Customer'},
+ {id:'segments',name:'Customer Segmentation',desc:'Simpan segmen pelanggan dan kriteria pengelompokan.',kind:'Customer'},
+ {id:'provider-api',name:'Multi-Provider API Manager',desc:'Daftar endpoint dan konfigurasi non-rahasia provider; secret wajib di server.',kind:'Integration'},
+ {id:'provider-health',name:'Provider Health Monitor',desc:'Catat hasil pemeriksaan provider dan waktu gangguan.',kind:'Integration'},
+ {id:'provider-failover',name:'Auto Provider Failover',desc:'Atur kebijakan provider cadangan; eksekusi otomatis butuh backend worker.',kind:'Integration'},
+ {id:'order-tracking',name:'Order Tracking Engine',desc:'Catat referensi eksternal dan progres order/provider.',kind:'Commerce'},
+ {id:'refund-refill',name:'Refund & Refill Manager',desc:'Kelola permintaan refund/refill dan keputusan admin.',kind:'Finance'},
+ {id:'admin-roles',name:'Multi-Admin Role Matrix',desc:'Catat matriks tugas admin. Enforcement hak akses perlu rules/backend role-aware.',kind:'Security'},
+ {id:'two-factor',name:'Two-Factor Security',desc:'Checklist status kebijakan 2FA. Aktivasi 2FA harus dilakukan melalui Firebase Auth/provider.',kind:'Security'},
+ {id:'fraud-cases',name:'Fraud Detection Cases',desc:'Tandai pola transaksi mencurigakan untuk pemeriksaan manual.',kind:'Security'},
+ {id:'recovery',name:'Database Recovery Center',desc:'Catat backup, verifikasi, dan pemulihan; backup ini bukan pengganti export Firebase penuh.',kind:'System'},
+ {id:'performance',name:'System Performance Monitor',desc:'Catat pengukuran performa dan insiden runtime dari pemeriksaan admin.',kind:'System'}
+];
+let activeEnterpriseModule = null;
+let enterpriseRecords = [];
+function renderEnterpriseModules(){
+ const host=$('enterpriseModuleGrid'); if(!host)return;
+ host.innerHTML=enterpriseModules.map(m=>`<button type="button" class="enterprise-module-card ${activeEnterpriseModule===m.id?'active':''}" data-enterprise-module="${m.id}"><small>${esc(m.kind)}</small><b>${esc(m.name)}</b><span>${esc(m.desc)}</span></button>`).join('');
+ host.querySelectorAll('[data-enterprise-module]').forEach(btn=>btn.addEventListener('click',()=>selectEnterpriseModule(btn.dataset.enterpriseModule)));
+}
+function resetEnterpriseForm(){const f=$('enterpriseRecordForm');if(!f)return;f.reset();f.elements.namedItem('id').value='';f.elements.namedItem('enabled').checked=true;}
+async function selectEnterpriseModule(id){
+ const module=enterpriseModules.find(x=>x.id===id); if(!module)return;
+ activeEnterpriseModule=id; renderEnterpriseModules();
+ $('enterpriseModuleKicker').textContent=`${module.kind.toUpperCase()} / FIRESTORE`;
+ $('enterpriseModuleTitle').textContent=module.name; $('enterpriseModuleDesc').textContent=module.desc;
+ resetEnterpriseForm(); await loadEnterpriseRecords();
+}
+async function loadEnterpriseRecords(){
+ if(!activeEnterpriseModule)return;
+ const host=$('enterpriseRecordsList'); host.innerHTML='<p class="muted-note">Memuat data dari Firestore...</p>';
+ try{
+  const snap=await getDocs(query(collection(db,'enterpriseRecords'),orderBy('updatedAt','desc')));
+  enterpriseRecords=snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.module===activeEnterpriseModule);
+  renderEnterpriseRecords();
+ }catch(e){host.innerHTML=`<p class="error-note">Gagal membaca data: ${esc(e.code||e.message)}</p>`;}
+}
+function renderEnterpriseRecords(){
+ const host=$('enterpriseRecordsList'); if(!host)return;
+ const q=($('enterpriseSearch')?.value||'').trim().toLowerCase();
+ const rows=enterpriseRecords.filter(x=>`${x.title||''} ${x.reference||''} ${x.notes||''} ${x.status||''}`.toLowerCase().includes(q));
+ host.innerHTML=rows.map(x=>`<article class="enterprise-record"><div class="enterprise-record-main"><b>${esc(x.title||'Tanpa judul')}</b><small>${esc(x.status||'pending')} · ${x.amount!==null&&x.amount!==undefined?'Rp '+money(x.amount):'Tanpa nominal'} · ${esc(x.reference||'Tanpa referensi')}</small><p>${esc(x.notes||'Tidak ada catatan')}</p></div><div class="enterprise-record-actions"><button class="btn ghost" type="button" data-enterprise-edit="${x.id}">Edit</button><button class="btn danger" type="button" data-enterprise-delete="${x.id}">Hapus</button></div></article>`).join('')||'<p class="muted-note">Belum ada data untuk modul ini.</p>';
+ host.querySelectorAll('[data-enterprise-edit]').forEach(b=>b.addEventListener('click',()=>{const x=enterpriseRecords.find(r=>r.id===b.dataset.enterpriseEdit);if(!x)return;const f=$('enterpriseRecordForm');f.elements.namedItem('id').value=x.id;f.elements.namedItem('title').value=x.title||'';f.elements.namedItem('status').value=x.status||'pending';f.elements.namedItem('amount').value=x.amount??'';f.elements.namedItem('reference').value=x.reference||'';f.elements.namedItem('notes').value=x.notes||'';f.elements.namedItem('enabled').checked=x.enabled!==false;f.scrollIntoView({behavior:'smooth',block:'center'});}));
+ host.querySelectorAll('[data-enterprise-delete]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Hapus catatan ini dari Firestore?'))return;try{await deleteDoc(doc(db,'enterpriseRecords',b.dataset.enterpriseDelete));logActivity(`Menghapus data ${activeEnterpriseModule}`);await loadEnterpriseRecords();}catch(e){showStatus('enterpriseStatus',showError('Gagal menghapus data',e));}}));
+}
+$('enterpriseRecordForm')?.addEventListener('submit',async e=>{
+ e.preventDefault(); if(!activeEnterpriseModule){showStatus('enterpriseStatus','Pilih modul terlebih dahulu.');return;}
+ const f=e.currentTarget,b=f.querySelector('[type="submit"]'); setBusy(b,true);
+ const data={module:activeEnterpriseModule,title:f.elements.namedItem('title').value.trim(),status:f.elements.namedItem('status').value,amount:f.elements.namedItem('amount').value===''?null:Number(f.elements.namedItem('amount').value),reference:f.elements.namedItem('reference').value.trim(),notes:f.elements.namedItem('notes').value.trim(),enabled:f.elements.namedItem('enabled').checked,updatedAt:serverTimestamp(),updatedBy:auth.currentUser?.uid||null};
+ try{const id=f.elements.namedItem('id').value;if(id){await updateDoc(doc(db,'enterpriseRecords',id),data);}else{data.createdAt=serverTimestamp();data.createdBy=auth.currentUser?.uid||null;await addDoc(collection(db,'enterpriseRecords'),data);}showStatus('enterpriseStatus','Data berhasil disimpan ke Firestore.');logActivity(`Menyimpan ${activeEnterpriseModule}: ${data.title}`);resetEnterpriseForm();await loadEnterpriseRecords();}
+ catch(err){showStatus('enterpriseStatus',showError('Gagal menyimpan data enterprise',err));}finally{setBusy(b,false);}
+});
+$('enterpriseRefresh')?.addEventListener('click',loadEnterpriseRecords);
+$('enterpriseReset')?.addEventListener('click',resetEnterpriseForm);
+$('enterpriseSearch')?.addEventListener('input',renderEnterpriseRecords);
+
+renderEnterpriseModules();
