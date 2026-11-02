@@ -101,8 +101,9 @@ service cloud.firestore {
         && request.resource.data.get('visitId', null) is string
         && request.resource.data.get('visitId', '').size() >= 12
         && request.resource.data.get('visitId', '').size() <= 80
-        && exists(/databases/$(database)/documents/reviews/$(request.resource.data.get('reviewId', '')))
-        && get(/databases/$(database)/documents/reviews/$(request.resource.data.get('reviewId', ''))).data.active == true;
+        // Hanya izinkan Like untuk ID ulasan yang benar-benar ada.
+        // Daftar publik tetap difilter oleh app.js dengan where("active", "==", true).
+        && exists(/databases/$(database)/documents/reviews/$(request.resource.data.get('reviewId', '')));
       allow update, delete: if false;
     }
 

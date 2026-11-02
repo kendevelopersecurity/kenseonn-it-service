@@ -686,18 +686,44 @@ function getVisitId(){let id=sessionStorage.getItem("kenseonn_visit_id");if(!id)
 document.addEventListener("click", async event => {
   const button = event.target.closest(".review-like");
   if (!button || button.disabled) return;
-  const reviewId = button.dataset.reviewId; if (!reviewId) return;
-  button.disabled = true; button.innerHTML = '<span class="inline-spinner"></span> Menyimpan...';
+  event.preventDefault();
+  const reviewId = button.dataset.reviewId;
+  if (!reviewId) return;
+
+  const originalLabel = '<span>♥</span> Suka lagi';
+  button.disabled = true;
+  button.removeAttribute("title");
+  button.innerHTML = '<span class="inline-spinner"></span> Menyimpan...';
+
   try {
-    let likeUser = currentLikeUser;
-    if (!likeUser) { const credential = await signInAnonymously(auth); likeUser = credential.user; currentLikeUser = likeUser; }
-    await addDoc(collection(db,"reviewLikes"),{reviewId,uid:likeUser.uid,visitId:getVisitId(),createdAt:serverTimestamp()});
-    sessionStorage.setItem(`kenseonn-liked-${reviewId}`,"1");
+    // Always use the current Firebase session; create an anonymous session if needed.
+    let likeUser = auth.currentUser || currentLikeUser;
+    if (!likeUser) {
+      const credential = await signInAnonymously(auth);
+      likeUser = credential.user;
+    }
+    if (!likeUser || !likeUser.uid) throw new Error("Sesi Firebase belum siap. Muat ulang halaman lalu coba lagi.");
+    currentLikeUser = likeUser;
+
+    // Append-only event: every click creates a new Like document. No Unlike operation exists.
+    await addDoc(collection(db, "reviewLikes"), {
+      reviewId,
+      uid: likeUser.uid,
+      visitId: getVisitId(),
+      createdAt: serverTimestamp()
+    });
+
+    sessionStorage.setItem(`kenseonn-liked-${reviewId}`, "1");
     await renderReviews();
-  } catch(error) {
-    console.error("Gagal menyimpan Like:",error);
-    showOrderStatus(`Like gagal disimpan (${error.code||error.message}). Pastikan Anonymous Authentication aktif dan Firestore Rules sudah diperbarui.`);
-    button.disabled=false; button.innerHTML='<span>♥</span> Coba lagi';
+  } catch (error) {
+    const code = error?.code || "unknown-error";
+    const detail = error?.message || String(error);
+    console.error("Gagal menyimpan Like:", { code, detail, reviewId, uid: auth.currentUser?.uid || null });
+    button.disabled = false;
+    button.innerHTML = '<span>♥</span> Coba lagi';
+    button.title = `${code}: ${detail}`;
+    button.setAttribute("aria-label", `Like gagal: ${code}. Ketuk untuk mencoba lagi.`);
+    showOrderStatus(`Like gagal (${code}): ${detail}`);
   }
 });
 
