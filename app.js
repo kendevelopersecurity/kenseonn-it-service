@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   where
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, updateProfile, sendPasswordResetEmail, reload, applyActionCode, verifyPasswordResetCode, confirmPasswordReset } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, updateProfile, sendPasswordResetEmail, reload, deleteUser, applyActionCode, verifyPasswordResetCode, confirmPasswordReset } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 const emailVerificationSettings = {
   url: "https://kendevelopersecurity.github.io/kenseonn-it-service/?emailVerification=1",
@@ -29,6 +29,13 @@ let currentLikeUser = null;
 let anonymousSignInPending = false;
 let registrationEnabled = true;
 const loginCooldownKey = "kenseonn_customer_login_until";
+function setMemberMode(enabled) {
+  document.body.classList.toggle("member-mode", !!enabled);
+  const nav = document.querySelector(".nav nav");
+  if (nav) nav.classList.toggle("hidden", !!enabled);
+  const memberNav = byId("memberQuickNav");
+  if (memberNav) memberNav.classList.toggle("hidden", !enabled);
+}
 
 const fallbackServices = [
   ['security-assessment', '🛡️', 'Audit Keamanan Website', 'Pemeriksaan konfigurasi dan risiko keamanan website milik klien.'],
@@ -304,6 +311,7 @@ function applyMaintenance() {
   if (status) status.textContent = site.maintenanceStatus || "MAINTENANCE";
 
   if (wa) wa.href = `https://wa.me/${String(site.whatsapp || "").replace(/\D/g, "")}`;
+  document.querySelectorAll(".admin-help-wa").forEach(link => { link.href = `https://wa.me/${String(site.whatsapp || "62895636069948").replace(/\D/g, "")}`; });
   if (ig) ig.href = `https://instagram.com/${encodeURIComponent(site.instagram || "")}`;
 
   startCountdown(site.maintenanceUntil);
@@ -402,6 +410,7 @@ onAuthStateChanged(auth, async authUser => {
     if (!authUser) {
       currentCustomer = null;
       currentLikeUser = null;
+      setMemberMode(false);
       if (authGuest) authGuest.classList.remove("hidden");
       if (customerDashboard) customerDashboard.classList.add("hidden");
       renderReviews();
@@ -423,6 +432,7 @@ onAuthStateChanged(auth, async authUser => {
     // Anonymous sessions are only for review likes; do not expose the customer dashboard or order account.
     if (user.isAnonymous) {
       currentCustomer = null;
+      setMemberMode(false);
       if (authGuest) authGuest.classList.remove("hidden");
       if (customerDashboard) customerDashboard.classList.add("hidden");
       const emailField = document.querySelector('#orderForm [name="email"]');
@@ -444,6 +454,7 @@ onAuthStateChanged(auth, async authUser => {
     }
     if (authGuest) authGuest.classList.add("hidden");
     if (customerDashboard) customerDashboard.classList.remove("hidden");
+    setMemberMode(true);
     setText("customerName", user.displayName || "Pelanggan Kenseonn");
     setText("customerEmail", user.email || "");
     setText("memberRank", memberProfile?.rank || "Member");
@@ -460,6 +471,7 @@ onAuthStateChanged(auth, async authUser => {
     setText("customerLoginStatus", `Sesi masuk terdeteksi, tetapi dashboard gagal dimuat: ${err.code || err.message}`);
     if (authGuest) authGuest.classList.remove("hidden");
     if (customerDashboard) customerDashboard.classList.add("hidden");
+    setMemberMode(false);
   }
 });
 
@@ -468,40 +480,49 @@ byId("registerForm")?.addEventListener("submit", async event => {
   if (!registrationEnabled) { setText("registerStatus", "Pendaftaran akun sedang ditutup oleh admin."); return; }
   const form = event.currentTarget, data = new FormData(form), button = form.querySelector('[type="submit"]');
   if (button.disabled) return;
+  let createdUser = null;
   try {
-    button.disabled = true; setText("registerStatus", "Membuat akun...");
-    if (String(data.get("phone") || "").trim().length < 8) throw new Error("Nomor WhatsApp minimal 8 karakter.");
-    const credential = await createUserWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password")));
-    await updateProfile(credential.user, { displayName: String(data.get("name")).trim() });
-    try {
-      await setDoc(doc(db, "customers", credential.user.uid), {
-        name: String(data.get("name")).trim(),
-        email: credential.user.email,
-        phone: String(data.get("phone")).trim(),
-        emailVerified: false,
-        rank: "Member",
-        status: "active",
-        createdAt: serverTimestamp()
-      }, { merge: true });
-    } catch (profileError) {
-      console.error("Profil pelanggan belum tersimpan:", profileError);
-    }
+    button.disabled = true; setText("registerStatus", "Membuat akun dan menyimpan profil member...");
+    const name = String(data.get("name") || "").trim();
+    const email = String(data.get("email") || "").trim().toLowerCase();
+    const phone = String(data.get("phone") || "").trim();
+    const password = String(data.get("password") || "");
+    if (name.length < 2 || name.length > 80) throw new Error("Nama harus 2–80 karakter.");
+    if (phone.replace(/\D/g, "").length < 8) throw new Error("Nomor WhatsApp minimal 8 digit.");
+    if (password.length < 8) throw new Error("Password minimal 8 karakter.");
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    createdUser = credential.user;
+    await updateProfile(createdUser, { displayName: name });
+    await setDoc(doc(db, "customers", createdUser.uid), {
+      name, email: createdUser.email, phone, emailVerified: false,
+      rank: "Member", status: "active", archived: false,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    });
     form.reset();
-    setText("registerStatus", "Pendaftaran berhasil! Akun member Anda sudah aktif dan otomatis masuk. Tidak perlu verifikasi email.");
-  } catch(err) {
+    setText("registerStatus", "Pendaftaran berhasil! Profil member tersimpan dan akun langsung aktif. Tidak perlu verifikasi email.");
+    setText("customerLoginStatus", "Akun berhasil dibuat dan Anda sudah masuk.");
+  } catch (err) {
+    console.error("Registrasi member gagal:", err);
+    if (createdUser) {
+      try { await deleteUser(createdUser); }
+      catch (rollbackError) {
+        console.error("Rollback Auth gagal:", rollbackError);
+        setText("registerStatus", `Akun Auth telah dibuat tetapi profil gagal disimpan (${err.code || err.message}). Hubungi admin agar akun diperiksa; jangan daftar berulang kali.`);
+        return;
+      }
+    }
     const messages = {
-      "auth/email-already-in-use": "Email sudah terdaftar. Masuk menggunakan akun tersebut.",
+      "auth/email-already-in-use": "Email sudah terdaftar. Silakan login.",
       "auth/invalid-email": "Format email tidak valid.",
       "auth/weak-password": "Password terlalu lemah. Gunakan minimal 8 karakter.",
-      "auth/operation-not-allowed": "Pendaftaran Email/Password belum diaktifkan di Firebase Authentication.",
-      "auth/too-many-requests": "Terlalu banyak percobaan. Tunggu sebentar sebelum mencoba lagi."
+      "auth/operation-not-allowed": "Aktifkan Email/Password di Firebase Authentication.",
+      "auth/too-many-requests": "Terlalu banyak percobaan. Tunggu sebelum mencoba lagi.",
+      "permission-denied": "Database menolak penyimpanan profil. Periksa Firestore Rules."
     };
-    setText("registerStatus", `Pendaftaran gagal: ${messages[err.code] || err.code || err.message}`);
-    if (auth.currentUser) await signOut(auth).catch(() => {});
-  }
-  finally { button.disabled = false; }
+    setText("registerStatus", `Pendaftaran gagal: ${messages[err.code] || err.message || err.code}`);
+    if (auth.currentUser && auth.currentUser.uid === createdUser?.uid) await signOut(auth).catch(() => {});
+  } finally { button.disabled = false; }
 });
-
 byId("customerLoginForm")?.addEventListener("submit", async event => {
   event.preventDefault();
   const form = event.currentTarget, data = new FormData(form), button = form.querySelector('[type="submit"]');
@@ -531,6 +552,7 @@ byId("customerLoginForm")?.addEventListener("submit", async event => {
   } finally { button.disabled = false; }
 });
 byId("customerLogout")?.addEventListener("click", () => signOut(auth));
+byId("memberNavLogout")?.addEventListener("click", () => signOut(auth));
 byId("customerResetPassword")?.addEventListener("click", async () => {
   const email = document.querySelector('#customerLoginForm [name="email"]')?.value.trim();
   if (!email) { setText("customerLoginStatus", "Isi email akun terlebih dahulu, lalu tekan Lupa password."); return; }
@@ -592,7 +614,7 @@ if (orderForm) orderForm.addEventListener("submit", async event => {
   if(name.length<2 || phone.replace(/\D/g,"").length<7 || !email || !service || details.length<5){showOrderStatus("Periksa nama, WhatsApp, email, layanan, dan detail pesanan.");return;}
   if(consent && !consent.checked){showOrderStatus("Centang persetujuan sebelum mengirim pesanan.");return;}
   const orderCode = `KN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
-  const payload = { uid:null, name, phone, email, service, details, status:"new", paymentStatus:"awaiting_quote", price:0, paymentNote:"Menunggu admin mengonfirmasi total tagihan dan instruksi pembayaran.", orderCode, source:"guest-order-v5", createdAt:serverTimestamp() };
+  const payload = { uid:currentCustomer?.uid || null, name, phone, email, service, details, status:"new", paymentStatus:"awaiting_quote", price:0, paymentNote:"Menunggu admin mengonfirmasi total tagihan dan instruksi pembayaran.", orderCode, source:currentCustomer ? "member-order-v5.2" : "guest-order-v5.2", createdAt:serverTimestamp() };
   try { button.disabled=true; setGlobalLoading(true, "Mengirim pesanan ke database..."); button.dataset.idleHtml=button.innerHTML; button.innerHTML='<span class="button-spinner"></span> Mengirim...'; showOrderStatus("Mengirim pesanan..."); await addDoc(collection(db,"orders"),payload); showOrderStatus(`Pesanan berhasil dikirim. Simpan kode ${orderCode}. Admin akan menghubungi Anda.`,true); form.reset(); }
   catch(err){ console.error("Guest order failed",err); showOrderStatus(`Pesanan gagal dikirim (${err.code||err.message}). Hubungi admin melalui WhatsApp.`); }
   finally {button.disabled=false; setGlobalLoading(false); if(button.dataset.idleHtml){button.innerHTML=button.dataset.idleHtml;delete button.dataset.idleHtml;}}

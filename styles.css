@@ -159,3 +159,15 @@ body[data-site-layout="aurora"]{background:radial-gradient(ellipse at 10% 0%,#17
 @media(prefers-reduced-motion:reduce){.brand-name-wrap #brandName,.brand-shimmer,.brand-mark,.brand-mark:after{animation:none!important}.review-card,.service-card,.price-card,.about-card,.contact-card{transition:none}}
 
 body[data-auto-theme="light"]{color-scheme:light}body[data-auto-theme="light"] .nav{background:rgba(245,249,252,.9);border-color:rgba(35,65,90,.15)}body[data-auto-theme="light"] .service-card,body[data-auto-theme="light"] .price-card,body[data-auto-theme="light"] .about-card,body[data-auto-theme="light"] .contact-card,body[data-auto-theme="light"] .review-card,body[data-auto-theme="light"] .order-panel{background:rgba(255,255,255,.88);color:#172738;border-color:rgba(40,75,100,.18)}body[data-auto-theme="light"] .hero-copy>p,body[data-auto-theme="light"] .section-head p,body[data-auto-theme="light"] .service-card p,body[data-auto-theme="light"] .review-card p{color:#526a7c}
+
+/* V5 Member Portal */
+.member-auth-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.member-auth-grid form{display:grid;gap:12px}.member-auth-grid label{display:grid;gap:6px}.member-auth-grid input,.member-rank-select{width:100%;padding:12px;border:1px solid var(--line,#334);border-radius:10px;background:var(--panel,#111827);color:inherit}.member-section{scroll-margin-top:90px}.member-section h3{margin-top:24px}@media(max-width:760px){.member-auth-grid{grid-template-columns:1fr}}
+
+/* Member workspace: public marketing sections are hidden while a member is signed in. */
+body.member-mode .nav nav:not(#memberQuickNav),
+body.member-mode main > section:not(#member):not(#order),
+body.member-mode #authGuest { display:none !important; }
+body.member-mode #member, body.member-mode #order { display:block !important; }
+.member-quick-nav { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.member-quick-nav.hidden { display:none !important; }
+.member-quick-nav a { color:var(--text,inherit); text-decoration:none; font-weight:700; }
