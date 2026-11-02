@@ -1,94 +1,66 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function isAdmin() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
-    }
-    function validText(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
-
-    match /siteConfig/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /services/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
-    match /packages/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
-    match /admins/{uid} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow write: if false;
-    }
-
-    match /orders/{id} {
-      allow create: if request.resource.data.keys().hasAll([
-        'uid','name','phone','email','service','details','status','paymentStatus',
-        'price','paymentNote','orderCode','source','createdAt'
-      ])
-      && (request.resource.data.uid == null || (signedIn() && request.resource.data.uid == request.auth.uid))
-      && validText(request.resource.data.name, 2, 80)
-      && validText(request.resource.data.phone, 7, 25)
-      && validText(request.resource.data.email, 5, 120)
-      && validText(request.resource.data.service, 2, 180)
-      && validText(request.resource.data.details, 5, 1500)
-      && request.resource.data.status == 'new'
-      && request.resource.data.paymentStatus == 'awaiting_quote'
-      && request.resource.data.price == 0
-      && validText(request.resource.data.paymentNote, 0, 500)
-      && validText(request.resource.data.orderCode, 1, 40)
-      && validText(request.resource.data.source, 1, 60);
-      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update, delete: if isAdmin();
-    }
-
-    match /supportTickets/{id} {
-      allow create: if request.resource.data.keys().hasAll(['ticketCode','name','email','phone','category','message','status','createdAt','source'])
-        && validText(request.resource.data.ticketCode,1,40)
-        && validText(request.resource.data.name,2,80)
-        && validText(request.resource.data.email,5,120)
-        && validText(request.resource.data.phone,7,25)
-        && validText(request.resource.data.category,1,80)
-        && validText(request.resource.data.message,5,1500)
-        && request.resource.data.status == 'open'
-        && validText(request.resource.data.source,1,60);
-      allow read, update, delete: if isAdmin();
-    }
-
-    match /customers/{uid} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name','email','phone','emailVerified','rank','status','archived','createdAt','updatedAt'])
-        && validText(request.resource.data.name,2,80)
-        && request.resource.data.email == request.auth.token.email
-        && validText(request.resource.data.phone,8,25)
-        && request.resource.data.rank == 'Member'
-        && request.resource.data.status == 'active'
-        && request.resource.data.archived == false;
-      allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','emailVerified','updatedAt']));
-      allow delete: if isAdmin();
-    }
-
-    match /adminLogs/{id} { allow read, create: if isAdmin(); allow update, delete: if false; }
-    match /reviews/{reviewId} { allow read: if true; allow create, update, delete: if isAdmin(); }
-    match /reviewLikes/{likeId} {
-      allow read: if true;
-      allow create: if signedIn()
-        && request.resource.data.keys().hasAll(['reviewId','uid','visitId','createdAt'])
-        && request.resource.data.keys().hasOnly(['reviewId','uid','visitId','createdAt'])
-        && request.resource.data.uid == request.auth.uid
-        && validText(request.resource.data.reviewId,1,160)
-        && validText(request.resource.data.visitId,12,80)
-        && exists(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId))
-        && get(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId)).data.active == true;
-      allow update, delete: if false;
-    }
-    match /reviewLikeAdjustments/{reviewId} {
-      allow read: if true;
-      allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['count','updatedAt','updatedBy'])
-        && request.resource.data.count is int && request.resource.data.count >= 0 && request.resource.data.count <= 100000000;
-      allow delete: if isAdmin();
-    }
-    match /adminNotifications/{id} { allow read, create, update, delete: if isAdmin(); }
-    match /enterpriseRecords/{id} { allow read, create, update, delete: if isAdmin(); }
-    match /{document=**} { allow read, write: if false; }
+ match /databases/{database}/documents {
+  function signedIn(){ return request.auth != null; }
+  function isAdmin(){ return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true; }
+  match /siteConfig/{id}{ allow read: if true; allow write: if isAdmin(); }
+  match /services/{id}{ allow read: if true; allow create,update,delete: if isAdmin(); }
+  match /packages/{id}{ allow read: if true; allow create,update,delete: if isAdmin(); }
+  match /admins/{uid}{ allow read: if isAdmin() || (signedIn() && request.auth.uid==uid); allow write: if false; }
+  match /orders/{id}{
+   allow create: if request.resource.data.keys().hasAll(['uid','name','phone','email','service','details','status','paymentStatus','price','orderCode','createdAt'])
+    && request.resource.data.uid == null
+    && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
+    && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25
+    && request.resource.data.email is string && request.resource.data.email.size() >= 5 && request.resource.data.email.size() <= 120
+    && request.resource.data.service is string && request.resource.data.service.size() >= 2 && request.resource.data.service.size() <= 180
+    && request.resource.data.details is string && request.resource.data.details.size() >= 5 && request.resource.data.details.size() <= 1500
+    && request.resource.data.status == 'new' && request.resource.data.paymentStatus == 'awaiting_quote' && request.resource.data.price == 0
+    && request.resource.data.orderCode is string && request.resource.data.orderCode.size() <= 40;
+   allow read: if isAdmin(); allow update,delete: if isAdmin();
   }
+  match /supportTickets/{id}{
+   allow create: if request.resource.data.keys().hasAll(['ticketCode','name','email','phone','category','message','status','createdAt'])
+    && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
+    && request.resource.data.email is string && request.resource.data.email.size() >= 5 && request.resource.data.email.size() <= 120
+    && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25
+    && request.resource.data.message is string && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 1500
+    && request.resource.data.status == 'open';
+   allow read,update,delete: if isAdmin();
+  }
+  match /customers/{uid} {
+   allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+   allow create: if signedIn() && request.auth.uid == uid
+     && request.resource.data.keys().hasOnly(['name','email','emailVerified','createdAt','updatedAt'])
+     && request.resource.data.email == request.auth.token.email;
+   allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','emailVerified','updatedAt']));
+   allow delete: if isAdmin();
+  }
+  match /adminLogs/{id}{ allow read,create: if isAdmin(); allow update,delete: if false; }
+
+  // Public reviews are curated by admins; customer likes are one-per-authenticated-UID.
+  match /reviews/{reviewId} {
+   allow read: if true;
+   allow create, update, delete: if isAdmin();
+  }
+  match /reviewLikes/{likeId} {
+   allow read: if true;
+   allow create: if signedIn()
+     && request.resource.data.keys().hasAll(['reviewId','uid','createdAt'])
+     && request.resource.data.uid == request.auth.uid
+     && request.resource.data.reviewId is string
+     && exists(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId))
+     && get(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId)).data.active == true
+     && likeId == request.resource.data.reviewId + '_' + request.auth.uid;
+   allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+   allow update: if false;
+  }
+  // Enterprise Command Suite: admin-managed operational records.
+  match /enterpriseRecords/{recordId} {
+    allow read, create, update, delete: if isAdmin();
+  }
+
+  match /{document=**}{ allow read,write: if false; }
+ }
 }

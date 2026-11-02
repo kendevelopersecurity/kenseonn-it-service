@@ -56,7 +56,6 @@ let customers = [];
 let supportTickets = [];
 let reviews = [];
 let reviewLikeCounts = {};
-let reviewLikeAdjustments = {};
 let adminLogs = [];
 let liveUnsubscribers = [];
 const adminLoginCooldownKey = "kenseonn_admin_login_until";
@@ -338,7 +337,6 @@ async function loadOrders() {
 
   showStatus("statOrders", orders.length);
   renderOrders();
-  renderCrmContacts();
   if (typeof renderOrderTools === "function") renderOrderTools();
 }
 
@@ -398,14 +396,13 @@ async function loadReviews() {
   reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   reviewLikeCounts = {};
   likesSnap.docs.forEach(like => { const rid = like.data().reviewId; if (rid) reviewLikeCounts[rid] = (reviewLikeCounts[rid] || 0) + 1; });
-  const adjSnap=await getDocs(collection(db,"reviewLikeAdjustments")); reviewLikeAdjustments={}; adjSnap.docs.forEach(d=>reviewLikeAdjustments[d.id]=Number(d.data().count)||0);
   renderReviewsAdmin();
 }
 
 function renderReviewsAdmin() {
   const host = $("reviewsAdminList");
   if (!host) return;
-  host.innerHTML = reviews.map(item => `<div class="admin-row"><div><b>${esc(item.customerName || "Pelanggan")} · ${"★".repeat(Math.max(1,Math.min(5,Number(item.rating)||5)))}</b><small>${esc(item.platform || "")} · ${esc(item.message || "")}</small><small>Status: ${item.active === false ? "Disembunyikan" : "Tampil"} · ♥ ${(reviewLikeCounts[item.id] || 0)+(reviewLikeAdjustments[item.id]||0)} Like tersimpan</small><label class="like-admin-control">Penyesuaian Like admin<input class="admin-like-count" type="number" min="0" max="100000000" value="${reviewLikeAdjustments[item.id]||0}" data-id="${esc(item.id)}"></label><button class="btn small save-admin-likes" type="button" data-id="${esc(item.id)}">Simpan angka</button></div><button class="btn small edit-review" type="button" data-id="${esc(item.id)}">Edit</button><button class="btn small danger delete-review" type="button" data-id="${esc(item.id)}">Hapus</button></div>`).join("") || '<p class="muted-note">Belum ada ulasan. Tambahkan feedback pelanggan asli di atas.</p>';
+  host.innerHTML = reviews.map(item => `<div class="admin-row"><div><b>${esc(item.customerName || "Pelanggan")} · ${"★".repeat(Math.max(1,Math.min(5,Number(item.rating)||5)))}</b><small>${esc(item.platform || "")} · ${esc(item.message || "")}</small><small>Status: ${item.active === false ? "Disembunyikan" : "Tampil"} · ♥ ${reviewLikeCounts[item.id] || 0} like nyata</small></div><button class="btn small edit-review" type="button" data-id="${esc(item.id)}">Edit</button><button class="btn small danger delete-review" type="button" data-id="${esc(item.id)}">Hapus</button></div>`).join("") || '<p class="muted-note">Belum ada ulasan. Tambahkan feedback pelanggan asli di atas.</p>';
 }
 
 async function loadCustomers() {
@@ -413,33 +410,16 @@ async function loadCustomers() {
   customers = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
   const count = $("statCustomers"); if (count) count.textContent = customers.length;
   renderCustomers();
-  renderCrmContacts();
 }
 
 function renderCustomers() {
   const target = $("customersAdminList"); if (!target) return;
   const q = String($("customerSearch")?.value || "").toLowerCase();
   const list = customers.filter(c => [c.name,c.email,c.phone,c.id].some(v => String(v||"").toLowerCase().includes(q)));
-  target.innerHTML = list.map(c => `<article class="admin-row"><div><b>${esc(c.name || "Pelanggan")}</b><small>${esc(c.email || "")} · UID ${esc(c.id)}<br>WhatsApp: ${esc(c.phone || "Belum diisi")} · Daftar: ${esc(dateValue(c.createdAt) || "Tidak tersedia")}</small></div><div><span class="status-chip">${c.status === "disabled" ? "Nonaktif" : (c.archived === true ? "Diarsipkan" : "Aktif") }</span><label>Pangkat <select class="member-rank-select" data-id="${esc(c.id)}"><option ${c.rank==="Member"?"selected":""}>Member</option><option ${c.rank==="Bronze"?"selected":""}>Bronze</option><option ${c.rank==="Silver"?"selected":""}>Silver</option><option ${c.rank==="Gold"?"selected":""}>Gold</option><option ${c.rank==="Platinum"?"selected":""}>Platinum</option><option ${c.rank==="VIP"?"selected":""}>VIP</option></select></label><button type="button" class="btn small member-status-toggle" data-id="${esc(c.id)}" data-status="${esc(c.status||"active")}">${c.status === "disabled" ? "Aktifkan" : "Nonaktifkan"}</button><button type="button" class="btn small danger customer-delete-profile" data-id="${esc(c.id)}">Hapus profil Firestore</button><button type="button" class="btn small customer-archive" data-id="${esc(c.id)}" data-archived="${c.archived===true}">${c.archived ? "Pulihkan profil" : "Arsipkan profil"}</button></div></article>`).join("") || '<p class="muted-note">Belum ada pelanggan yang cocok.</p>';
+  target.innerHTML = list.map(c => `<article class="admin-row"><div><b>${esc(c.name || "Pelanggan")}</b><small>${esc(c.email || "")} · UID ${esc(c.id)}<br>WhatsApp: ${esc(c.phone || "Belum diisi")} · Daftar: ${esc(dateValue(c.createdAt) || "Tidak tersedia")}</small></div><div><span class="status-chip">${c.archived ? "Diarsipkan" : (c.emailVerified === true ? "Email terverifikasi" : "Menunggu verifikasi")}</span><button type="button" class="btn small customer-archive" data-id="${esc(c.id)}" data-archived="${c.archived===true}">${c.archived ? "Pulihkan" : "Arsipkan"}</button></div></article>`).join("") || '<p class="muted-note">Belum ada pelanggan yang cocok.</p>';
 }
 $("customerSearch")?.addEventListener("input", renderCustomers);
-$("customersAdminList")?.addEventListener("change", async e=>{
-  const select=e.target.closest(".member-rank-select"); if(!select) return;
-  try { await updateDoc(doc(db,"customers",select.dataset.id),{rank:select.value,rankUpdatedAt:serverTimestamp(),rankUpdatedBy:auth.currentUser?.uid||""}); logActivity(`Mengubah pangkat member ${select.dataset.id} menjadi ${select.value}`); await loadCustomers(); } catch(err) { alert(showError("Gagal mengubah pangkat",err)); }
-});
 $("customersAdminList")?.addEventListener("click", async e=>{
-  const statusBtn=e.target.closest(".member-status-toggle");
-  if(statusBtn){ const next=statusBtn.dataset.status === "disabled" ? "active" : "disabled"; if(!confirm(`${next === "disabled" ? "Nonaktifkan" : "Aktifkan kembali"} akses member ini di website?`)) return; statusBtn.disabled=true; try { await updateDoc(doc(db,"customers",statusBtn.dataset.id),{status:next,statusUpdatedAt:serverTimestamp(),statusUpdatedBy:auth.currentUser?.uid||""}); logActivity(`${next === "disabled" ? "Menonaktifkan" : "Mengaktifkan"} member ${statusBtn.dataset.id}`); await loadCustomers(); } catch(err) { alert(showError("Gagal mengubah status member",err)); } finally { statusBtn.disabled=false; } return; }
-  const del=e.target.closest(".customer-delete-profile");
-  if(del){
-    const id=del.dataset.id;
-    if(!confirm("Hapus dokumen profil member dari Firestore? Akun Firebase Authentication TIDAK ikut terhapus dan mungkin masih bisa login.")) return;
-    del.disabled=true;
-    try{await deleteDoc(doc(db,"customers",id));logActivity(`Menghapus dokumen profil member ${id}; akun Auth tetap ada`);await loadCustomers();}
-    catch(err){alert(showError("Gagal menghapus profil member",err));}
-    finally{del.disabled=false;}
-    return;
-  }
   const btn=e.target.closest(".customer-archive"); if(!btn) return;
   const id=btn.dataset.id, archived=btn.dataset.archived!=="true";
   if(!confirm(archived ? "Arsipkan pelanggan ini? Akun Firebase Auth tidak dihapus." : "Pulihkan profil pelanggan ini?")) return;
@@ -592,35 +572,6 @@ $("packageCancel")?.addEventListener("click", () => {
 });
 
 // TAMPILKAN DAFTAR LAYANAN
-
-// Unified CRM: gabungkan akun pelanggan dan kontak pesanan tamu dari data Firestore.
-function buildCrmContacts() {
-  const map = new Map();
-  const keyFor = (x) => String(x.email || x.phone || x.id || "").trim().toLowerCase();
-  for (const c of customers) {
-    const key = keyFor(c); if (!key) continue;
-    map.set(key, { key, name:c.name || "Pelanggan", email:c.email || "", phone:c.phone || "", uid:c.id || "", orders:[], verified:c.emailVerified===true });
-  }
-  for (const o of orders) {
-    const key = keyFor(o); if (!key) continue;
-    const row = map.get(key) || { key, name:o.name || "Kontak pesanan", email:o.email || "", phone:o.phone || "", uid:"", orders:[], verified:false };
-    row.name = row.name || o.name || "Kontak pesanan"; row.email = row.email || o.email || ""; row.phone = row.phone || o.phone || "";
-    row.orders.push(o); map.set(key,row);
-  }
-  return [...map.values()].sort((a,b)=>b.orders.length-a.orders.length || a.name.localeCompare(b.name));
-}
-function renderCrmContacts() {
-  const host=$("crmContactsList"); if(!host) return;
-  const q=String($("crmSearch")?.value||"").toLowerCase();
-  const rows=buildCrmContacts().filter(c=>[c.name,c.email,c.phone,c.uid,...c.orders.map(o=>o.orderCode)].some(v=>String(v||"").toLowerCase().includes(q)));
-  host.innerHTML=rows.map(c=>`<article class="admin-row"><div><b>${esc(c.name)}</b><small>${esc(c.email)} · ${esc(c.phone)}${c.uid?` · Akun: ${esc(c.uid)}`:" · Pesanan tamu"}</small><small>${c.orders.length} pesanan · Total nilai tercatat Rp ${money(c.orders.reduce((n,o)=>n+Number(o.price||0),0))} · Kode: ${esc(c.orders.slice(0,3).map(o=>o.orderCode||o.id).join(", ")||"Belum ada")}</small></div><span class="status-chip">${c.verified?"Akun terverifikasi":c.uid?"Akun pelanggan":"Kontak tamu"}</span></article>`).join("") || '<p class="muted-note">Belum ada kontak yang cocok.</p>';
-}
-$("crmSearch")?.addEventListener("input",renderCrmContacts);
-$("exportCrmCsv")?.addEventListener("click",()=>{
-  const rows=buildCrmContacts(); const quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
-  const csv=[['Nama','Email','WhatsApp','UID','Jumlah Pesanan','Total Nilai Tercatat','Kode Pesanan'].map(quote).join(","),...rows.map(c=>[c.name,c.email,c.phone,c.uid,c.orders.length,c.orders.reduce((n,o)=>n+Number(o.price||0),0),c.orders.map(o=>o.orderCode||o.id).join(" | ")].map(quote).join(","))].join("\r\n");
-  const url=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download=`kenseonn-crm-${new Date().toISOString().slice(0,10)}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);logActivity(`Export CRM (${rows.length} kontak)`);
-});
 
 function renderServices() {
   const container = $("servicesAdminList");
@@ -854,8 +805,6 @@ $("reviewsAdminList")?.addEventListener("click", async event => {
   }
 });
 
-$("reviewsAdminList")?.addEventListener("click",async event=>{const b=event.target.closest(".save-admin-likes");if(!b)return;const id=b.dataset.id,input=document.querySelector(`.admin-like-count[data-id="${CSS.escape(id)}"]`),count=Math.floor(Number(input?.value));if(!Number.isFinite(count)||count<0||count>100000000){showStatus("reviewStatus","Angka Like harus 0 sampai 100.000.000.");return;}b.disabled=true;try{await setDoc(doc(db,"reviewLikeAdjustments",id),{count,updatedAt:serverTimestamp(),updatedBy:auth.currentUser?.uid||""},{merge:true});await loadReviews();showStatus("reviewStatus","Penyesuaian Like admin tersimpan di Firestore.");logActivity("Mengubah penyesuaian Like review");}catch(e){showStatus("reviewStatus",showError("Gagal menyimpan angka Like",e));}finally{b.disabled=false;}});
-
 // FINAL ULTIMATE 50: design controls, diagnostics, reports and operational helpers.
 const capabilityNames = [
 "Admin login Firebase","Pemeriksaan UID admin","Dashboard ringkasan","Penghitungan pesanan","Penghitungan layanan","Penghitungan paket","Ringkasan pesanan baru","Ringkasan pesanan selesai","Ringkasan nilai pesanan","Edit profil brand","Edit judul hero","Edit deskripsi hero","Edit email kontak","Edit Instagram","Edit WhatsApp","Maintenance mode","Maintenance countdown","CRUD katalog IT","Aktif/nonaktif layanan","CRUD paket boosting","Edit platform boosting","Edit kuantitas paket","Edit harga paket","Edit garansi paket","Daftar order Firebase","Ubah status order","Pencarian order","Filter status order","Refresh order","Tetapkan nominal tagihan","Ubah status pembayaran","Tulis instruksi pembayaran","Export CSV order","Kode order unik sisi browser","Matrix Rain","Starfield","Snowfall","Cyber particles","Preset tema","Warna aksen","Kontrol kecepatan efek","Kontrol kepadatan efek","Kontrol glow","Toggle scanline","Toggle grid","Toggle motion","Edit monogram","Analytics status","Layanan populer","Rasio penyelesaian","Monitor halaman dari browser","Tes baca Firestore","Backup JSON katalog","Restore konfigurasi situs","Export katalog CSV","Activity log sesi lokal","Layout responsif admin","Dashboard akun pelanggan","Registrasi pelanggan","Login pelanggan","Logout pelanggan","Daftar pesanan milik akun","Refresh riwayat pelanggan","Pemesanan dengan akun","Penyimpanan UID pelanggan","Validasi nomor WhatsApp","Validasi detail pesanan","Persetujuan kepemilikan/izin","Status menunggu penawaran","Status menunggu pembayaran","Status pembayaran lunas","Catatan pembayaran per order","Tagihan per order","Instruksi transfer per order","Katalog layanan IT","Katalog paket sosial","Tautan order dari kartu layanan","Tautan order dari kartu paket","FAQ layanan","Kontak email","Kontak WhatsApp","Kontak Instagram","Halaman maintenance","Pengaturan pembayaran manual","Proteksi data pelanggan per UID","Akses baca order oleh admin","Akses update order oleh admin","Akses CRUD katalog oleh admin","Aturan catch-all deny","Tidak meminta password akun sosial","Peringatan jangan kirim OTP","Peringatan scope security berizin","Riwayat status pesanan","Pencarian nama pelanggan","Pencarian nomor pelanggan","Pencarian kode order","Pencarian detail order","Ekspor data pesanan","Ekspor katalog layanan","Timestamp pembaruan order"
@@ -875,19 +824,9 @@ function logActivity(message){
   }).catch(err=>console.warn("Audit log tidak tersimpan:",err.code||err.message));
 }
 function navigatePane(id){document.querySelectorAll(".admin-tab").forEach(t=>t.classList.toggle("active",t.dataset.pane===id));document.querySelectorAll(".admin-pane").forEach(p=>p.classList.toggle("hidden",p.id!==id));}
-async function refreshAccessInfo(){
-  const email=$("accessSessionEmail"),role=$("accessSessionRole"),status=$("accessStatus");
-  if(email) email.textContent=auth.currentUser?.email||"Tidak ada sesi";
-  if(role) role.textContent="Memeriksa...";
-  try{const u=auth.currentUser;if(!u)throw new Error("Sesi admin tidak ditemukan.");const snap=await getDoc(doc(db,"admins",u.uid));const ok=snap.exists()&&snap.data().enabled===true;if(role)role.textContent=ok?"ADMIN AKTIF":"TIDAK AKTIF";if(status)status.textContent=ok?"Dokumen admin ditemukan dan enabled=true.":"Dokumen admin tidak aktif atau tidak ditemukan.";}
-  catch(e){if(role)role.textContent="GAGAL DIPERIKSA";if(status)status.textContent=`Pemeriksaan gagal: ${e.code||e.message}`;}
-}
-$("refreshAccessInfo")?.addEventListener("click",refreshAccessInfo);
-document.querySelector('[data-pane="accessPane"]')?.addEventListener("click",refreshAccessInfo);
-
 document.addEventListener("click",e=>{const b=e.target.closest("[data-jump]");if(b){navigatePane(b.dataset.jump);$(b.dataset.jump)?.scrollIntoView({behavior:"smooth",block:"start"});}});
 function fillDesignForm(data={}){const f=$("designForm");if(!f)return;for(const [k,v] of Object.entries({theme:"matrix",layout:"cyber",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//",...data})){const el=f.elements.namedItem(k);if(el){if(el.type==="checkbox")el.checked=v===true;else el.value=v??"";}}$("speedOutput").textContent=f.elements.speed.value;$("densityOutput").textContent=f.elements.density.value;}
-const designDefaults={theme:"matrix",layout:"cyber",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K"};
+const designDefaults={theme:"matrix",layout:"cyber",effect:"matrix",accent:"#79f2a0",accent2:"#58d9ff",speed:5,density:55,glow:"medium",motion:true,scanline:true,grid:true,logoText:"K//"};
 const originalRefreshAll=refreshAll;
 // Load saved visual config after the existing site document has been loaded.
 const _refreshAllUltimate=refreshAll;
@@ -895,8 +834,8 @@ const _refreshAllUltimate=refreshAll;
 setTimeout(async()=>{try{const snap=await getDoc(doc(db,"siteConfig","main"));if(snap.exists())fillDesignForm({...designDefaults,...(snap.data().design||{})});else fillDesignForm();}catch(e){console.warn("Design settings load:",e);fillDesignForm();}},1200);
 async function readCurrentDesign(){const snap=await getDoc(doc(db,"siteConfig","main"));return snap.exists()?(snap.data().design||{}):{};}
 function collectDesignForm(){const f=$("designForm"),d={};for(const key of Object.keys(designDefaults)){const el=f?.elements.namedItem(key);d[key]=el?.type==="checkbox"?el.checked:el?.type==="range"?Number(el.value):el?.value;}return d;}
-function previewSelectedLayout(){const layout=$("designForm")?.elements.namedItem("layout")?.value||"cyber";const preview=$("layoutPreview");if(!preview)return;preview.dataset.layout=layout;preview.style.setProperty("--lp-accent",$("designForm")?.elements.namedItem("accent")?.value||"#79f2a0");preview.style.setProperty("--lp-accent2",$("designForm")?.elements.namedItem("accent2")?.value||"#58d9ff");preview.classList.remove("preview-refresh");void preview.offsetWidth;preview.classList.add("preview-refresh");const title=preview.querySelector(".layout-preview-hero h3");if(title)title.textContent=({cyber:"Secure your digital future.",saas:"A smarter workspace for growth.",business:"Digital excellence, delivered.",glass:"Clarity meets innovation.",matrix:"ACCESS. BUILD. SECURE.",editorial:"Technology with intention.",aurora:"Move forward with confidence.",neon:"Make your next move visible.",royal:"A premium digital standard.",minimal:"Less noise. Better systems.",hologram:"Beyond the ordinary interface.",quantum:"Precision for a connected world.",emerald:"Reliable technology, refined.",midnight:"Built for the next generation.",frost:"A clearer way to work.",sunset:"Ideas into digital momentum.",terminal:"SYSTEM READY_",titanium:"Strength in every solution.",orbit:"Your digital world, connected.",adaptive:"Designed around your environment."})[layout]||"Build your digital presence.";}
-$("designForm")?.elements.namedItem("layout")?.addEventListener("change",previewSelectedLayout);["accent","accent2"].forEach(k=>$("designForm")?.elements.namedItem(k)?.addEventListener("input",previewSelectedLayout));
+function previewSelectedLayout(){const layout=$("designForm")?.elements.namedItem("layout")?.value||"cyber";const preview=$("layoutPreview");if(preview)preview.dataset.layout=layout;}
+$("designForm")?.elements.namedItem("layout")?.addEventListener("change",previewSelectedLayout);
 $("previewLayout")?.addEventListener("click",()=>{previewSelectedLayout();showStatus("designStatus","Preview layout diperbarui. Belum diterapkan ke website publik.");});
 $("designForm")?.addEventListener("submit",async e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('button[type="submit"]')||f.querySelector('button:not([type])'),d=collectDesignForm();if(btn)btn.disabled=true;showStatus("designStatus","Menyimpan desain dan riwayat sebelumnya...");try{const ref=doc(db,"siteConfig","main"),snap=await getDoc(ref),old=snap.exists()?(snap.data().design||{}):{};await setDoc(ref,{design:d,previousDesign:Object.keys(old).length?old:designDefaults},{merge:true});showStatus("designStatus","Layout dan desain berhasil disimpan. Website publik menerapkannya saat dimuat ulang.");previewSelectedLayout();logActivity("Mengubah tema dan layout website");}catch(err){showStatus("designStatus",showError("Gagal menyimpan desain",err));}finally{if(btn)btn.disabled=false;}});
 $("restorePreviousLayout")?.addEventListener("click",async()=>{const b=$("restorePreviousLayout");b.disabled=true;showStatus("designStatus","Mengambil tampilan sebelumnya...");try{const ref=doc(db,"siteConfig","main"),snap=await getDoc(ref),data=snap.exists()?snap.data():{},previous=data.previousDesign;if(!previous||typeof previous!=="object")throw new Error("Belum ada riwayat tampilan sebelumnya. Simpan perubahan tema terlebih dahulu.");const current=data.design||designDefaults;await setDoc(ref,{design:previous,previousDesign:current},{merge:true});fillDesignForm({...designDefaults,...previous});previewSelectedLayout();showStatus("designStatus","Tampilan sebelumnya berhasil dipulihkan. Muat ulang website publik untuk melihat hasilnya.");logActivity("Memulihkan tampilan website sebelumnya");}catch(err){showStatus("designStatus",showError("Gagal memulihkan tampilan",err));}finally{b.disabled=false;}});
@@ -930,7 +869,7 @@ $("refreshAnalytics")?.addEventListener("click",async()=>{try{await loadOrders()
 $("runMonitor")?.addEventListener("click",async()=>{const out=$("monitorResult");out.textContent="Memeriksa...";const start=performance.now();try{const res=await fetch("./",{cache:"no-store"});out.textContent=`HTTP ${res.status} · ${Math.round(performance.now()-start)} ms`;logActivity("Monitor website dijalankan");}catch(e){out.textContent="Gagal dijangkau dari browser ini";}});
 $("runFirebaseCheck")?.addEventListener("click",async()=>{const out=$("firebaseResult");out.textContent="Memeriksa...";try{await getDoc(doc(db,"siteConfig","main"));out.textContent="Firestore read OK";logActivity("Tes koneksi Firestore berhasil");}catch(e){out.textContent=`Gagal: ${e.code||e.message}`;}});
 $("backupData")?.addEventListener("click",async()=>{try{const [siteSnap,s,p]=await Promise.all([getDoc(doc(db,"siteConfig","main")),getDocs(collection(db,"services")),getDocs(collection(db,"packages"))]);const payload={schema:"kenseonn-backup-v1",createdAt:new Date().toISOString(),site:siteSnap.data()||{},services:s.docs.map(d=>({id:d.id,...d.data()})),packages:p.docs.map(d=>({id:d.id,...d.data()}))};const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));a.download="kenseonn-backup.json";a.click();URL.revokeObjectURL(a.href);logActivity("Backup JSON diunduh");}catch(e){alert(showError("Backup gagal",e));}});
-$("restoreData")?.addEventListener("click",async()=>{const file=$("restoreFile")?.files?.[0];if(!file){alert("Pilih file backup JSON terlebih dahulu.");return;}try{const data=JSON.parse(await file.text());if(data.schema==="kenseonn-backup-v1"&&data.site&&typeof data.site==="object"){if(!confirm("Restore konfigurasi siteConfig/main dari backup?"))return;await setDoc(doc(db,"siteConfig","main"),data.site,{merge:true});alert("Konfigurasi berhasil direstore.");logActivity("Restore konfigurasi website");return;}if(data.schema!=="kenseonn-recovery-snapshot-v2"||!data.siteConfig||!data.collections||typeof data.collections!=="object")throw new Error("Format backup tidak dikenali");const allowed=["services","packages","orders","supportTickets","customers","reviews","reviewLikes","reviewLikeAdjustments","adminLogs","adminNotifications","enterpriseRecords"];let total=0;for(const name of allowed){const rows=data.collections[name]||[];if(!Array.isArray(rows))throw new Error(`Data koleksi ${name} tidak valid`);total+=rows.length;}if(total>450)throw new Error("Snapshot berisi lebih dari 450 dokumen. Pecah backup menjadi beberapa bagian sebelum restore.");if(!confirm(`RESTORE SNAPSHOT: ${total} dokumen + konfigurasi. Data yang ada akan digabung/ditimpa berdasarkan ID; dokumen lain tidak dihapus. Pastikan backup benar. Lanjutkan?`))return;await setDoc(doc(db,"siteConfig","main"),data.siteConfig,{merge:true});let restored=0;for(const name of allowed){for(const item of (data.collections[name]||[])){if(!item||typeof item.id!=="string"||!item.id)continue;const copy={...item};delete copy.id;await setDoc(doc(db,name,item.id),copy,{merge:true});restored++;}}alert(`Recovery selesai: ${restored} dokumen dipulihkan. Dokumen yang tidak ada di backup tidak dihapus.`);logActivity(`Recovery snapshot dipulihkan (${restored} dokumen)`);}catch(e){alert(showError("Restore gagal",e));}});
+$("restoreData")?.addEventListener("click",async()=>{const file=$("restoreFile")?.files?.[0];if(!file){alert("Pilih file backup JSON terlebih dahulu.");return;}if(!confirm("Restore akan menggabungkan konfigurasi ke siteConfig/main. Lanjutkan?"))return;try{const data=JSON.parse(await file.text());if(data.schema!=="kenseonn-backup-v1"||!data.site||typeof data.site!=="object")throw new Error("Format backup tidak dikenali");await setDoc(doc(db,"siteConfig","main"),data.site,{merge:true});alert("Konfigurasi berhasil direstore. Layanan dan paket tidak ditimpa otomatis demi keamanan.");logActivity("Restore konfigurasi website");}catch(e){alert(showError("Restore gagal",e));}});
 $("clearActivity")?.addEventListener("click",()=>{localActivity=[];$("activityLog").innerHTML="<p>Log lokal dibersihkan.</p>";});
 // Recompute overview whenever original loaders finish and after status updates.
 const _loadOrdersUltimate=loadOrders;
@@ -957,14 +896,13 @@ function startLiveAdminFeeds(){
   if(!auth.currentUser)return;
   const feed=(path,callback)=>{const unsub=onSnapshot(collection(db,path),snap=>callback(snap),err=>console.warn(`Live ${path}:`,err.code||err.message));liveUnsubscribers.push(unsub);};
   // Real-time listener only for admin-readable collections; no writes are performed here.
-  feed("orders",snap=>{orders=snap.docs.map(d=>({id:d.id,...d.data()}));renderOrderTools();renderAnalytics();renderCrmContacts();});
+  feed("orders",snap=>{orders=snap.docs.map(d=>({id:d.id,...d.data()}));renderOrderTools();renderAnalytics();});
   feed("services",snap=>{services=snap.docs.map(d=>({id:d.id,...d.data()}));showStatus("statServices",services.length);renderServices();});
   feed("packages",snap=>{packages=snap.docs.map(d=>({id:d.id,...d.data()}));showStatus("statPackages",packages.length);renderPackages();});
   feed("supportTickets",snap=>{supportTickets=snap.docs.map(d=>({id:d.id,...d.data()}));renderTickets();});
   feed("reviews",snap=>{reviews=snap.docs.map(d=>({id:d.id,...d.data()}));renderReviewsAdmin();});
   feed("reviewLikes",snap=>{reviewLikeCounts={};snap.docs.forEach(d=>{const rid=d.data().reviewId;if(rid)reviewLikeCounts[rid]=(reviewLikeCounts[rid]||0)+1;});renderReviewsAdmin();});
   feed("adminLogs",snap=>{adminLogs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{const av=a.createdAt?.toMillis?.()||0,bv=b.createdAt?.toMillis?.()||0;return bv-av;});renderAdminLogs();});
-  loadAdminNotifications();
 }
 
 // DIAGNOSTIK FRONT-END: pemeriksaan runtime ringan, bukan pemindai keamanan server.
@@ -1094,117 +1032,3 @@ $('enterpriseReset')?.addEventListener('click',resetEnterpriseForm);
 $('enterpriseSearch')?.addEventListener('input',renderEnterpriseRecords);
 
 renderEnterpriseModules();
-
-
-// BRAND LOGO STUDIO — saved to the existing public site configuration.
-const logoForm=$("brandLogoForm");
-function updateBrandPreview(){if(!logoForm)return;const name=logoForm.elements.name.value.trim()||"KENSEONN",mark=logoForm.elements.mark.value.trim()||"K",style=logoForm.elements.style.value;const icon=$("adminBrandPreview");icon.dataset.logo=style;$("adminBrandPreviewText").textContent=mark;$("adminBrandPreviewName").textContent=name;}
-if(logoForm){logoForm.addEventListener("input",updateBrandPreview);logoForm.addEventListener("change",updateBrandPreview);(async()=>{try{const snap=await getDoc(doc(db,"siteConfig","main"));const b=snap.exists()?snap.data().brandLogo||{}:{};logoForm.elements.name.value=b.name||"KENSEONN";logoForm.elements.mark.value=b.mark||"K";logoForm.elements.style.value=String(b.style??0);updateBrandPreview();}catch(e){showStatus("brandLogoStatus",showError("Gagal memuat logo",e));}})();logoForm.addEventListener("submit",async e=>{e.preventDefault();const btn=logoForm.querySelector('[type="submit"]'),brandLogo={name:logoForm.elements.name.value.trim(),mark:logoForm.elements.mark.value.trim(),style:Number(logoForm.elements.style.value)};if(!brandLogo.name||!brandLogo.mark)return;btn.disabled=true;try{await setDoc(doc(db,"siteConfig","main"),{brandLogo},{merge:true});showStatus("brandLogoStatus","Logo dan nama brand tersimpan di Firestore. Muat ulang website publik untuk menerapkan.");logActivity("Memperbarui identitas logo Kenseonn");}catch(err){showStatus("brandLogoStatus",showError("Gagal menyimpan logo",err));}finally{btn.disabled=false;}});}
-$("resetBrandLogo")?.addEventListener("click",async()=>{if(!confirm("Reset logo dan nama brand ke identitas awal KENSEONN?"))return;try{await setDoc(doc(db,"siteConfig","main"),{brandLogo:{name:"KENSEONN",mark:"K",style:0}},{merge:true});logoForm.elements.name.value="KENSEONN";logoForm.elements.mark.value="K";logoForm.elements.style.value="0";updateBrandPreview();showStatus("brandLogoStatus","Logo awal berhasil dipulihkan.");logActivity("Reset logo brand");}catch(e){showStatus("brandLogoStatus",showError("Reset logo gagal",e));}});
-
-// Admin appearance: 20 genuinely distinct panel skins, persisted locally for the admin browser.
-const adminSkinNames=["obsidian","aurora","royal","ocean","emerald","sunset","ice","carbon","cyber","minimal","gold","crimson","matrix","hologram","navy","lavender","mint","copper","mono","adaptive"];
-function applyAdminSkin(name,announce=true){const skin=adminSkinNames.includes(name)?name:"obsidian";document.body.dataset.adminSkin=skin;try{localStorage.setItem("kenseonnAdminSkin",skin);}catch(e){}const sel=$("adminSkinSelect");if(sel)sel.value=skin;const pv=$("adminSkinPreview");if(pv)pv.dataset.skin=skin;if(announce&&$("adminSkinStatus"))$("adminSkinStatus").textContent="Layout admin diterapkan dan tersimpan pada browser ini.";}
-(()=>{let saved="obsidian";try{saved=localStorage.getItem("kenseonnAdminSkin")||"obsidian";}catch(e){}applyAdminSkin(saved,false);})();
-$("adminSkinSelect")?.addEventListener("change",e=>{const pv=$("adminSkinPreview");if(pv)pv.dataset.skin=e.target.value;});
-$("applyAdminSkin")?.addEventListener("click",()=>applyAdminSkin($("adminSkinSelect")?.value||"obsidian"));
-$("resetAdminSkin")?.addEventListener("click",()=>applyAdminSkin("obsidian"));
-
-// Expanded system diagnostics: real browser checks and Firestore reads, not decorative status labels.
-$("runSystemDeepCheck")?.addEventListener("click",async()=>{const out=$("systemDeepResult");out.textContent="Menjalankan pemeriksaan...";const checks=[];const test=(name,ok,detail)=>checks.push({name,ok,detail});test("Firebase Auth session",!!auth.currentUser,auth.currentUser?"Admin session aktif":"Tidak ada sesi admin aktif");try{const checksData=await Promise.allSettled([getDoc(doc(db,"siteConfig","main")),getDocs(collection(db,"services")),getDocs(collection(db,"packages")),getDocs(collection(db,"reviews")),getDocs(collection(db,"reviewLikes")),getDocs(collection(db,"orders")),getDocs(collection(db,"supportTickets")),getDocs(collection(db,"enterpriseRecords")),getDocs(collection(db,"adminLogs"))]);const labels=["Site configuration","Services","Packages","Reviews","Review Like events","Orders","Support tickets","Enterprise records","Admin audit logs"];checksData.forEach((r,i)=>{const ok=r.status==="fulfilled";const val=ok?(i===0?(r.value.exists()?"Dokumen siteConfig/main tersedia":"Dokumen belum dibuat"):(`${r.value.size} dokumen/event`)):(r.reason?.code||r.reason?.message||"Gagal dibaca");test(labels[i],ok && (i!==0||r.value.exists()),val);});}catch(e){test("Firestore diagnostics",false,e.code||e.message);}try{const paths=["index.html","styles.css","app.js","admin.html","admin.js","admin-premium.css","firebase-config.js"];const assetResults=await Promise.all(paths.map(async p=>{const r=await fetch(p,{cache:"no-store"});return {p,ok:r.ok,status:r.status};}));assetResults.forEach(x=>test("Asset "+x.p,x.ok,x.ok?"HTTP "+x.status:"HTTP "+x.status+" — periksa deploy/path"));}catch(e){test("Website assets",false,e.message||"Fetch gagal");}test("Browser storage",!!window.sessionStorage&&!!window.localStorage,"Storage browser tersedia");test("Reduced motion support",!!window.matchMedia,"Preferensi aksesibilitas dapat diperiksa");out.innerHTML=checks.map(c=>`<div class="diagnostic-row"><b>${c.ok?"✓":"✕"} ${esc(c.name)}</b><small>${esc(c.detail)}</small></div>`).join("");logActivity("Menjalankan deep system check");});
-
-// RECOVERY / SECURITY / PERFORMANCE TOOLKIT (browser-side, factual checks only).
-const runtimeErrors = [];
-function recordRuntimeError(kind, message, source = "") {
-  const item = { time: new Date().toISOString(), kind, message: String(message || "Unknown error").slice(0, 500), source: String(source || "").slice(0, 240) };
-  runtimeErrors.push(item);
-  if (runtimeErrors.length > 100) runtimeErrors.shift();
-  const count = $("runtimeErrorCount"), list = $("runtimeErrorList");
-  if (count) count.textContent = `${runtimeErrors.length} error tercatat pada sesi ini`;
-  if (list) list.innerHTML = runtimeErrors.slice(-8).reverse().map(x => `<div class="diagnostic-row"><b>${esc(x.kind)} · ${esc(x.message)}</b><small>${esc(x.time)} ${esc(x.source)}</small></div>`).join("") || '<small class="muted-note">Belum ada error runtime.</small>';
-}
-window.addEventListener("error", e => recordRuntimeError("JavaScript", e.message, `${e.filename || ""}:${e.lineno || 0}`));
-window.addEventListener("unhandledrejection", e => recordRuntimeError("Promise", e.reason?.code || e.reason?.message || e.reason || "Unhandled rejection"));
-
-$("exportRuntimeErrors")?.addEventListener("click", () => {
-  const payload = { schema: "kenseonn-runtime-errors-v1", generatedAt: new Date().toISOString(), errors: runtimeErrors };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
-  const a = document.createElement("a"); a.href = url; a.download = `kenseonn-runtime-errors-${Date.now()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-});
-$("clearRuntimeErrors")?.addEventListener("click", () => { runtimeErrors.length = 0; const c=$("runtimeErrorCount"),l=$("runtimeErrorList"); if(c)c.textContent="0 error tercatat"; if(l)l.innerHTML='<small class="muted-note">Log sesi dibersihkan.</small>'; });
-
-$("runSecurityAudit")?.addEventListener("click", async () => {
-  const out=$("securityAuditResult"), list=$("securityAuditList"); out.textContent="Memeriksa keamanan..."; list.innerHTML="";
-  const rows=[]; const add=(name,ok,detail)=>rows.push({name,ok,detail});
-  const user=auth.currentUser;
-  add("Admin authentication",!!user,user?`Sesi aktif · ${user.email || "akun tanpa email"}`:"Tidak ada sesi autentikasi");
-  if(user){
-    try { const a=await getDoc(doc(db,"admins",user.uid)); const enabled=a.exists() && a.data().enabled===true; add("Admin allowlist",enabled,enabled?"Dokumen admins/{uid} aktif":"Dokumen admin tidak ada atau enabled bukan true"); }
-    catch(e){add("Admin allowlist",false,e.code||e.message);}
-  } else add("Admin allowlist",false,"Tidak dapat diperiksa tanpa sesi admin");
-  for (const path of ["siteConfig","services","packages","orders","supportTickets","customers","reviews","reviewLikes","reviewLikeAdjustments","adminLogs","adminNotifications"]) {
-    try { const snap=await getDocs(query(collection(db,path))); add(`Firestore read: ${path}`,true,`${snap.size} dokumen dapat dibaca`); }
-    catch(e){add(`Firestore read: ${path}`,false,e.code||e.message);}
-  }
-  add("HTTPS context",location.protocol==="https:",`Halaman dibuka melalui ${location.protocol}`);
-  add("Browser online",navigator.onLine===true,navigator.onLine?"Koneksi browser terdeteksi online":"Browser melaporkan offline");
-  add("App Check",false,"Status enforcement/token App Check tidak dapat dibuktikan dari client ini. Periksa Firebase Console.");
-  const fail=rows.filter(x=>!x.ok).length;
-  out.textContent=`${rows.length-fail}/${rows.length} pemeriksaan lolos · ${fail} perlu perhatian`;
-  list.innerHTML=rows.map(x=>`<div class="diagnostic-row"><b>${x.ok?"✓":"!"} ${esc(x.name)}</b><small>${esc(x.detail)}</small></div>`).join("");
-  logActivity(`Security audit: ${fail} item perlu perhatian dari ${rows.length}`);
-});
-
-$("runPerformanceAudit")?.addEventListener("click", async () => {
-  const out=$("performanceResult"), list=$("performanceList"); out.textContent="Mengukur..."; list.innerHTML="";
-  const rows=[];
-  const paths=["./index.html","./styles.css","./app.js","./admin.html","./admin.js","./admin-premium.css"];
-  for(const path of paths){
-    const start=performance.now();
-    try{const r=await fetch(`${path}?_perf=${Date.now()}`,{cache:"no-store"});const ms=Math.round(performance.now()-start);rows.push({name:path,ok:r.ok,detail:`HTTP ${r.status} · ${ms} ms`});}
-    catch(e){rows.push({name:path,ok:false,detail:e.message||"Fetch gagal"});}
-  }
-  const nav=performance.getEntriesByType("navigation")[0];
-  if(nav) rows.push({name:"Page load (navigation)",ok:true,detail:`${Math.round(nav.loadEventEnd||nav.duration)} ms total · DOM ${Math.round(nav.domContentLoadedEventEnd)} ms`});
-  rows.push({name:"Network",ok:navigator.onLine===true,detail:navigator.onLine?`Online${navigator.connection?.effectiveType?` · ${navigator.connection.effectiveType}`:""}`:"Offline"});
-  rows.push({name:"Device memory",ok:true,detail:navigator.deviceMemory?`${navigator.deviceMemory} GB reported by browser":"Tidak tersedia pada browser ini"});
-  const slow=rows.filter(x=>/ms/.test(x.detail)&&parseInt(x.detail,10)>2000).length;
-  out.textContent=`Pengukuran selesai · ${slow} aset/halaman di atas 2 detik`;
-  list.innerHTML=rows.map(x=>`<div class="diagnostic-row"><b>${x.ok?"✓":"✕"} ${esc(x.name)}</b><small>${esc(x.detail)}</small></div>`).join("");
-  logActivity("Menjalankan Performance Monitor");
-});
-
-// Persistent internal admin notifications (Firestore-backed, not browser-only alerts).
-async function loadAdminNotifications(){
-  const host=$("adminNotificationsList"); if(!host)return;
-  host.innerHTML='<p class="muted-note">Memuat notifikasi...</p>';
-  try{
-    const snap=await getDocs(query(collection(db,"adminNotifications"),orderBy("createdAt","desc")));
-    host.innerHTML=snap.docs.map(d=>({id:d.id,...d.data()})).map(n=>`<article class="admin-row"><div><b>${esc(n.title||"Notifikasi")}</b><small>${esc(n.priority||"normal").toUpperCase()} · ${esc(n.createdBy||"Admin")} · ${esc(dateValue(n.createdAt)||"Baru")}</small><p>${esc(n.message||"")}</p></div><button class="btn small danger delete-admin-notification" data-id="${esc(n.id)}" type="button">Hapus</button></article>`).join("")||'<p class="muted-note">Belum ada notifikasi internal.</p>';
-  }catch(e){host.innerHTML=`<p class="muted-note">Gagal memuat: ${esc(e.code||e.message)}</p>`;}
-}
-$("adminNotificationForm")?.addEventListener("submit",async e=>{
-  e.preventDefault();const form=e.currentTarget,btn=form.querySelector('[type="submit"]'),status=$("adminNotificationStatus");
-  const title=form.elements.title.value.trim(),message=form.elements.message.value.trim();if(!title||!message)return;
-  btn.disabled=true;status.textContent="Menyimpan ke Firestore...";
-  try{await addDoc(collection(db,"adminNotifications"),{title,message,priority:form.elements.priority.value,createdBy:auth.currentUser?.email||auth.currentUser?.uid||"Admin",createdAt:serverTimestamp()});form.reset();status.textContent="Notifikasi tersimpan di Firestore.";await loadAdminNotifications();logActivity("Membuat notifikasi internal admin");}
-  catch(err){status.textContent=`Gagal: ${err.code||err.message}`;}
-  finally{btn.disabled=false;}
-});
-$("refreshAdminNotifications")?.addEventListener("click",loadAdminNotifications);
-$("adminNotificationsList")?.addEventListener("click",async e=>{const b=e.target.closest(".delete-admin-notification");if(!b)return;if(!confirm("Hapus notifikasi internal ini?"))return;b.disabled=true;try{await deleteDoc(doc(db,"adminNotifications",b.dataset.id));await loadAdminNotifications();logActivity("Menghapus notifikasi internal admin");}catch(err){alert(showError("Gagal menghapus notifikasi",err));}finally{b.disabled=false;}});
-
-$("createRecoverySnapshot")?.addEventListener("click", async () => {
-  const out=$("recoveryResult"), btn=$("createRecoverySnapshot"); out.textContent="Mengumpulkan data..."; btn.disabled=true;
-  const collectionsToBackup=["services","packages","orders","supportTickets","customers","reviews","reviewLikes","reviewLikeAdjustments","adminLogs","adminNotifications","enterpriseRecords"];
-  try{
-    const site=await getDoc(doc(db,"siteConfig","main"));
-    const results=await Promise.all(collectionsToBackup.map(async name=>{const snap=await getDocs(collection(db,name));return [name,snap.docs.map(d=>({id:d.id,...d.data()}))];}));
-    const payload={schema:"kenseonn-recovery-snapshot-v2",createdAt:new Date().toISOString(),project:"Kenseonn IT Service",siteConfig:site.exists()?site.data():null,collections:Object.fromEntries(results),notice:"Backup ini dapat berisi data pribadi pelanggan/pesanan. Simpan di tempat privat dan jangan unggah ke repositori publik."};
-    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
-    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`kenseonn-recovery-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
-    const total=results.reduce((n,x)=>n+x[1].length,0);out.textContent=`Snapshot berhasil diunduh · ${total} dokumen + konfigurasi`;
-    logActivity(`Recovery snapshot diunduh (${total} dokumen)`);
-  }catch(e){out.textContent=`Snapshot gagal: ${e.code||e.message}`;logActivity("Recovery snapshot gagal");}
-  finally{btn.disabled=false;}
-});
