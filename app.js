@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   where
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, sendEmailVerification, reload, applyActionCode, verifyPasswordResetCode, confirmPasswordReset } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, updateProfile, sendPasswordResetEmail, sendEmailVerification, reload, applyActionCode, verifyPasswordResetCode, confirmPasswordReset } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 const emailVerificationSettings = {
   url: "https://kendevelopersecurity.github.io/kenseonn-it-service/?emailVerification=1",
@@ -24,6 +24,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 let currentCustomer = null;
+// Separate identity for review likes; anonymous visitors never become customer-dashboard users.
+let currentLikeUser = null;
+let anonymousSignInPending = false;
 let registrationEnabled = true;
 const loginCooldownKey = "kenseonn_customer_login_until";
 
@@ -398,21 +401,44 @@ onAuthStateChanged(auth, async authUser => {
   try {
     if (!authUser) {
       currentCustomer = null;
+      currentLikeUser = null;
       if (authGuest) authGuest.classList.remove("hidden");
       if (customerDashboard) customerDashboard.classList.add("hidden");
       renderReviews();
       const emailField = document.querySelector('#orderForm [name="email"]');
       if (emailField) emailField.readOnly = false;
+      // Give each public visitor a persistent anonymous Firebase UID for one-like-per-browser identity.
+      if (!anonymousSignInPending) {
+        anonymousSignInPending = true;
+        try { await signInAnonymously(auth); }
+        catch (error) {
+          console.error("Firebase Anonymous Authentication gagal:", error);
+          setText("customerLoginStatus", `Like pengunjung belum tersedia: ${error.code || error.message}. Admin perlu mengaktifkan Anonymous di Firebase Authentication.`);
+        } finally { anonymousSignInPending = false; }
+      }
+      return;
+    }
+    const user = authUser;
+    currentLikeUser = user;
+    // Anonymous sessions are only for review likes; do not expose the customer dashboard or order account.
+    if (user.isAnonymous) {
+      currentCustomer = null;
+      if (authGuest) authGuest.classList.remove("hidden");
+      if (customerDashboard) customerDashboard.classList.add("hidden");
+      const emailField = document.querySelector('#orderForm [name="email"]');
+      if (emailField) emailField.readOnly = false;
+      renderReviews();
       return;
     }
     // Refresh the Firebase user before deciding whether to show the dashboard.
-    await reload(authUser);
-    const user = auth.currentUser || authUser;
-    currentCustomer = user;
-    if (!user.emailVerified) {
+    await reload(user);
+    currentLikeUser = auth.currentUser || user;
+    currentCustomer = currentLikeUser;
+    if (!currentCustomer.emailVerified) {
       if (authGuest) authGuest.classList.remove("hidden");
       if (customerDashboard) customerDashboard.classList.add("hidden");
       setText("customerLoginStatus", "Email belum diverifikasi. Buka tautan verifikasi terbaru di Gmail, lalu login kembali.");
+      renderReviews();
       return;
     }
     if (authGuest) authGuest.classList.add("hidden");
@@ -656,15 +682,28 @@ async function renderReviews() {
 document.addEventListener("click", async event => {
   const button = event.target.closest(".review-like");
   if (!button || button.disabled) return;
-  if (!currentCustomer) { showOrderStatus("Silakan login sebagai pelanggan untuk menyukai ulasan."); location.hash = "account"; return; }
   const reviewId = button.dataset.reviewId;
   if (!reviewId) return;
-  const likeRef = doc(db, "reviewLikes", `${reviewId}_${currentCustomer.uid}`);
+  let likeUser = currentLikeUser;
+  if (!likeUser) {
+    button.disabled = true;
+    try {
+      const credential = await signInAnonymously(auth);
+      likeUser = credential.user;
+      currentLikeUser = likeUser;
+    } catch (error) {
+      console.error("Anonymous like sign-in gagal:", error);
+      showOrderStatus(`Like belum tersedia: ${error.code || error.message}. Coba muat ulang halaman.`);
+      button.disabled = false;
+      return;
+    }
+  }
+  const likeRef = doc(db, "reviewLikes", `${reviewId}_${likeUser.uid}`);
   const liked = button.getAttribute("aria-pressed") === "true";
   button.disabled = true; button.innerHTML = '<span class="inline-spinner"></span> Menyimpan...';
   try {
     if (liked) await deleteDoc(likeRef);
-    else await setDoc(likeRef, { reviewId, uid: currentCustomer.uid, createdAt: serverTimestamp() });
+    else await setDoc(likeRef, { reviewId, uid: likeUser.uid, createdAt: serverTimestamp() });
     await renderReviews();
   } catch (error) {
     console.error("Gagal memperbarui like:", error);
