@@ -39,7 +39,7 @@ service cloud.firestore {
   }
   match /adminLogs/{id}{ allow read,create: if isAdmin(); allow update,delete: if false; }
 
-  // Public reviews are curated by admins; customer likes are one-per-authenticated-UID.
+  // Public reviews are curated by admins. Like events are append-only: no unlike/update/delete.
   match /reviews/{reviewId} {
    allow read: if true;
    allow create, update, delete: if isAdmin();
@@ -47,14 +47,25 @@ service cloud.firestore {
   match /reviewLikes/{likeId} {
    allow read: if true;
    allow create: if signedIn()
-     && request.resource.data.keys().hasAll(['reviewId','uid','createdAt'])
+     && request.resource.data.keys().hasAll(['reviewId','uid','visitId','createdAt'])
+     && request.resource.data.keys().hasOnly(['reviewId','uid','visitId','createdAt'])
      && request.resource.data.uid == request.auth.uid
      && request.resource.data.reviewId is string
+     && request.resource.data.visitId is string
+     && request.resource.data.visitId.size() >= 12
+     && request.resource.data.visitId.size() <= 80
      && exists(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId))
-     && get(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId)).data.active == true
-     && likeId == request.resource.data.reviewId + '_' + request.auth.uid;
-   allow delete: if signedIn() && resource.data.uid == request.auth.uid;
-   allow update: if false;
+     && get(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId)).data.active == true;
+   allow update, delete: if false;
+  }
+  match /reviewLikeAdjustments/{reviewId} {
+   allow read: if true;
+   allow create, update: if isAdmin()
+     && request.resource.data.keys().hasOnly(['count','updatedAt','updatedBy'])
+     && request.resource.data.count is int
+     && request.resource.data.count >= 0
+     && request.resource.data.count <= 100000000;
+   allow delete: if isAdmin();
   }
   // Enterprise Command Suite: admin-managed operational records.
   match /enterpriseRecords/{recordId} {
