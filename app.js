@@ -407,7 +407,7 @@ onAuthStateChanged(auth, async authUser => {
       renderReviews();
       const emailField = document.querySelector('#orderForm [name="email"]');
       if (emailField) emailField.readOnly = false;
-      // Give each public visitor a persistent anonymous Firebase UID for one-like-per-browser identity.
+      // Give each public visitor an anonymous Firebase UID; each Like click is stored as an append-only event.
       if (!anonymousSignInPending) {
         anonymousSignInPending = true;
         try { await signInAnonymously(auth); }
@@ -621,10 +621,12 @@ loadData();
 // VISUAL ENGINE: matrix rain, starfield, snowfall and particles (reduced-motion aware).
 function applyDesign() {
   const d = site.design || {};
-  const allowedLayouts = ["cyber", "saas", "business", "glass", "matrix", "editorial"];
+  const allowedLayouts = ["cyber","saas","business","glass","matrix","editorial","aurora","neon","royal","minimal","hologram","quantum","emerald","midnight","frost","sunset","terminal","titanium","orbit","adaptive"];
   document.body.dataset.siteLayout = allowedLayouts.includes(d.layout) ? d.layout : "cyber";
   const themes = {matrix:["#79f2a0","#58d9ff","#070b10"],aurora:["#8be7ff","#b9a4ff","#07101a"],violet:["#c69aff","#64dcff","#0c0715"],ember:["#ff9a67","#ffd36e","#100a08"],mono:["#d5e0eb","#91a2b5","#080b0f"]};
-  const palette = themes[d.theme] || themes.matrix;
+  const systemDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)").matches : true;
+  const palette = d.theme === "auto" ? (systemDark ? themes.matrix : ["#24445b","#547f9a","#f2f6fa"]) : (themes[d.theme] || themes.matrix);
+  document.body.dataset.autoTheme = d.theme === "auto" ? (systemDark ? "dark" : "light") : "off";
   const accent = d.accent || palette[0], accent2 = d.accent2 || palette[1];
   document.documentElement.style.setProperty("--accent", accent);
   document.documentElement.style.setProperty("--accent2", accent2);
@@ -633,7 +635,8 @@ function applyDesign() {
   document.body.classList.toggle("no-scanline", d.scanline === false);
   document.body.classList.toggle("no-grid", d.grid === false);
   document.documentElement.style.setProperty("--glow-strength", d.glow === "high" ? ".34" : d.glow === "low" ? ".06" : ".18");
-  const mark = document.querySelector(".brand-mark"); if (mark && d.logoText) mark.textContent = d.logoText;
+  const mark = document.querySelector("#publicBrandMark"); if (mark) { mark.dataset.logo=String(site.brandLogo?.style ?? 0); const t=mark.querySelector("#brandMarkText"); if(t)t.textContent=site.brandLogo?.mark || d.logoText || "K"; }
+  const brandName=byId("brandName"); if(brandName) brandName.textContent=site.brandLogo?.name || site.brandName || "KENSEONN";
   startVisualEffect(d);
 }
 let fxFrame = 0;
@@ -664,13 +667,13 @@ async function renderReviews() {
       grid.innerHTML = '<div class="reviews-empty"><span>✦</span><h3>Belum ada ulasan terverifikasi</h3><p>Ulasan akan muncul setelah admin memasukkan feedback pelanggan yang benar-benar diterima.</p></div>';
       return;
     }
-    const user = currentCustomer;
+    const visitId = getVisitId();
     const cards = await Promise.all(rows.map(async review => {
-      const likesSnap = await getDocs(query(collection(db, "reviewLikes"), where("reviewId", "==", review.id)));
-      let liked = false;
-      if (user) liked = (await getDoc(doc(db, "reviewLikes", `${review.id}_${user.uid}`))).exists();
+      const [likesSnap, adjustmentSnap] = await Promise.all([getDocs(query(collection(db, "reviewLikes"), where("reviewId", "==", review.id))), getDoc(doc(db, "reviewLikeAdjustments", review.id))]);
+      const adjusted = Number(adjustmentSnap.exists() ? adjustmentSnap.data().count : 0) || 0;
+      const liked = sessionStorage.getItem(`kenseonn-liked-${review.id}`) === "1";
       const rating = Math.max(1, Math.min(5, Number(review.rating) || 5));
-      return `<article class="review-card"><div class="review-card-top"><span class="review-avatar">${esc((review.customerName || "P").trim().charAt(0).toUpperCase())}</span><div><b>${esc(review.customerName || "Pelanggan")}</b><small>${esc(review.platform || "Layanan Kenseonn")}</small></div><span class="review-verified">✓ Dikelola admin</span></div><div class="review-stars" aria-label="Rating ${rating} dari 5">${"★".repeat(rating)}${"☆".repeat(5-rating)}</div><p>${esc(review.message || "")}</p><button class="review-like ${liked ? "liked" : ""}" type="button" data-review-id="${esc(review.id)}" aria-pressed="${liked}"><span>♥</span> Suka <b class="like-count">${likesSnap.size}</b></button></article>`;
+      return `<article class="review-card"><div class="review-card-top"><span class="review-avatar">${esc((review.customerName || "P").trim().charAt(0).toUpperCase())}</span><div><b>${esc(review.customerName || "Pelanggan")}</b><small>${esc(review.platform || "Layanan Kenseonn")}</small></div><span class="review-verified">✓ Dikelola admin</span></div><div class="review-stars" aria-label="Rating ${rating} dari 5">${"★".repeat(rating)}${"☆".repeat(5-rating)}</div><p>${esc(review.message || "")}</p><button class="review-like ${liked ? "liked" : ""}" type="button" data-review-id="${esc(review.id)}" aria-pressed="${liked}"><span>♥</span> Suka lagi <b class="like-count">${likesSnap.size + adjusted}</b></button></article>`;
     }));
     grid.innerHTML = cards.join("");
   } catch (error) {
@@ -679,35 +682,24 @@ async function renderReviews() {
   }
 }
 
+function getVisitId(){let id=sessionStorage.getItem("kenseonn_visit_id");if(!id){id=`visit_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,14)}`;sessionStorage.setItem("kenseonn_visit_id",id);}return id;}
 document.addEventListener("click", async event => {
   const button = event.target.closest(".review-like");
   if (!button || button.disabled) return;
-  const reviewId = button.dataset.reviewId;
-  if (!reviewId) return;
-  let likeUser = currentLikeUser;
-  if (!likeUser) {
-    button.disabled = true;
-    try {
-      const credential = await signInAnonymously(auth);
-      likeUser = credential.user;
-      currentLikeUser = likeUser;
-    } catch (error) {
-      console.error("Anonymous like sign-in gagal:", error);
-      showOrderStatus(`Like belum tersedia: ${error.code || error.message}. Coba muat ulang halaman.`);
-      button.disabled = false;
-      return;
-    }
-  }
-  const likeRef = doc(db, "reviewLikes", `${reviewId}_${likeUser.uid}`);
-  const liked = button.getAttribute("aria-pressed") === "true";
+  const reviewId = button.dataset.reviewId; if (!reviewId) return;
   button.disabled = true; button.innerHTML = '<span class="inline-spinner"></span> Menyimpan...';
   try {
-    if (liked) await deleteDoc(likeRef);
-    else await setDoc(likeRef, { reviewId, uid: likeUser.uid, createdAt: serverTimestamp() });
+    let likeUser = currentLikeUser;
+    if (!likeUser) { const credential = await signInAnonymously(auth); likeUser = credential.user; currentLikeUser = likeUser; }
+    await addDoc(collection(db,"reviewLikes"),{reviewId,uid:likeUser.uid,visitId:getVisitId(),createdAt:serverTimestamp()});
+    sessionStorage.setItem(`kenseonn-liked-${reviewId}`,"1");
     await renderReviews();
-  } catch (error) {
-    console.error("Gagal memperbarui like:", error);
-    showOrderStatus(`Like gagal disimpan: ${error.code || error.message}`);
-    button.disabled = false;
+  } catch(error) {
+    console.error("Gagal menyimpan Like:",error);
+    showOrderStatus(`Like gagal disimpan (${error.code||error.message}). Pastikan Anonymous Authentication aktif dan Firestore Rules sudah diperbarui.`);
+    button.disabled=false; button.innerHTML='<span>♥</span> Coba lagi';
   }
 });
+
+// Keep Auto theme synchronized when the device appearance changes while the page is open.
+if (window.matchMedia) { const appearanceQuery=window.matchMedia("(prefers-color-scheme: dark)"); appearanceQuery.addEventListener?.("change",()=>{if(site.design?.theme==="auto")applyDesign();}); }
