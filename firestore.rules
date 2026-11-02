@@ -1,77 +1,122 @@
 rules_version = '2';
 service cloud.firestore {
- match /databases/{database}/documents {
-  function signedIn(){ return request.auth != null; }
-  function isAdmin(){ return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true; }
-  match /siteConfig/{id}{ allow read: if true; allow write: if isAdmin(); }
-  match /services/{id}{ allow read: if true; allow create,update,delete: if isAdmin(); }
-  match /packages/{id}{ allow read: if true; allow create,update,delete: if isAdmin(); }
-  match /admins/{uid}{ allow read: if isAdmin() || (signedIn() && request.auth.uid==uid); allow write: if false; }
-  match /orders/{id}{
-   allow create: if request.resource.data.keys().hasAll(['uid','name','phone','email','service','details','status','paymentStatus','price','orderCode','createdAt'])
-    && request.resource.data.uid == null
-    && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
-    && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25
-    && request.resource.data.email is string && request.resource.data.email.size() >= 5 && request.resource.data.email.size() <= 120
-    && request.resource.data.service is string && request.resource.data.service.size() >= 2 && request.resource.data.service.size() <= 180
-    && request.resource.data.details is string && request.resource.data.details.size() >= 5 && request.resource.data.details.size() <= 1500
-    && request.resource.data.status == 'new' && request.resource.data.paymentStatus == 'awaiting_quote' && request.resource.data.price == 0
-    && request.resource.data.orderCode is string && request.resource.data.orderCode.size() <= 40;
-   allow read: if isAdmin(); allow update,delete: if isAdmin();
-  }
-  match /supportTickets/{id}{
-   allow create: if request.resource.data.keys().hasAll(['ticketCode','name','email','phone','category','message','status','createdAt'])
-    && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
-    && request.resource.data.email is string && request.resource.data.email.size() >= 5 && request.resource.data.email.size() <= 120
-    && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 25
-    && request.resource.data.message is string && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 1500
-    && request.resource.data.status == 'open';
-   allow read,update,delete: if isAdmin();
-  }
-  match /customers/{uid} {
-   allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-   allow create: if signedIn() && request.auth.uid == uid
-     && request.resource.data.keys().hasOnly(['name','email','emailVerified','createdAt','updatedAt'])
-     && request.resource.data.email == request.auth.token.email;
-   allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
-     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','emailVerified','updatedAt']));
-   allow delete: if isAdmin();
-  }
-  match /adminLogs/{id}{ allow read,create: if isAdmin(); allow update,delete: if false; }
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
+    }
 
-  // Public reviews are curated by admins. Like events are append-only: no unlike/update/delete.
-  match /reviews/{reviewId} {
-   allow read: if true;
-   allow create, update, delete: if isAdmin();
-  }
-  match /reviewLikes/{likeId} {
-   allow read: if true;
-   allow create: if signedIn()
-     && request.resource.data.keys().hasAll(['reviewId','uid','visitId','createdAt'])
-     && request.resource.data.keys().hasOnly(['reviewId','uid','visitId','createdAt'])
-     && request.resource.data.uid == request.auth.uid
-     && request.resource.data.reviewId is string
-     && request.resource.data.visitId is string
-     && request.resource.data.visitId.size() >= 12
-     && request.resource.data.visitId.size() <= 80
-     && exists(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId))
-     && get(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId)).data.active == true;
-   allow update, delete: if false;
-  }
-  match /reviewLikeAdjustments/{reviewId} {
-   allow read: if true;
-   allow create, update: if isAdmin()
-     && request.resource.data.keys().hasOnly(['count','updatedAt','updatedBy'])
-     && request.resource.data.count is int
-     && request.resource.data.count >= 0
-     && request.resource.data.count <= 100000000;
-   allow delete: if isAdmin();
-  }
-  // Enterprise Command Suite: admin-managed operational records.
-  match /enterpriseRecords/{recordId} {
-    allow read, create, update, delete: if isAdmin();
-  }
+    match /siteConfig/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /services/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /packages/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /admins/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow write: if false;
+    }
 
-  match /{document=**}{ allow read,write: if false; }
- }
+    // Guest order form sends uid:null and also includes paymentNote + source.
+    match /orders/{id} {
+      allow create: if request.resource.data.keys().hasAll([
+          'uid','name','phone','email','service','details','status',
+          'paymentStatus','price','paymentNote','orderCode','source','createdAt'
+        ])
+        && request.resource.data.get('uid', 'missing') == null
+        && request.resource.data.get('name', null) is string
+        && request.resource.data.get('name', '').size() >= 2
+        && request.resource.data.get('name', '').size() <= 80
+        && request.resource.data.get('phone', null) is string
+        && request.resource.data.get('phone', '').size() >= 7
+        && request.resource.data.get('phone', '').size() <= 25
+        && request.resource.data.get('email', null) is string
+        && request.resource.data.get('email', '').size() >= 5
+        && request.resource.data.get('email', '').size() <= 120
+        && request.resource.data.get('service', null) is string
+        && request.resource.data.get('service', '').size() >= 2
+        && request.resource.data.get('service', '').size() <= 180
+        && request.resource.data.get('details', null) is string
+        && request.resource.data.get('details', '').size() >= 5
+        && request.resource.data.get('details', '').size() <= 1500
+        && request.resource.data.get('status', '') == 'new'
+        && request.resource.data.get('paymentStatus', '') == 'awaiting_quote'
+        && request.resource.data.get('price', -1) == 0
+        && request.resource.data.get('paymentNote', null) is string
+        && request.resource.data.get('paymentNote', '').size() <= 500
+        && request.resource.data.get('orderCode', null) is string
+        && request.resource.data.get('orderCode', '').size() <= 40
+        && request.resource.data.get('source', null) is string
+        && request.resource.data.get('source', '').size() <= 60;
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Public helpdesk ticket form includes source: public-helpdesk-v5.
+    match /supportTickets/{id} {
+      allow create: if request.resource.data.keys().hasAll([
+          'ticketCode','name','email','phone','category','message','status','createdAt','source'
+        ])
+        && request.resource.data.get('ticketCode', null) is string
+        && request.resource.data.get('ticketCode', '').size() <= 40
+        && request.resource.data.get('name', null) is string
+        && request.resource.data.get('name', '').size() >= 2
+        && request.resource.data.get('name', '').size() <= 80
+        && request.resource.data.get('email', null) is string
+        && request.resource.data.get('email', '').size() >= 5
+        && request.resource.data.get('email', '').size() <= 120
+        && request.resource.data.get('phone', null) is string
+        && request.resource.data.get('phone', '').size() >= 7
+        && request.resource.data.get('phone', '').size() <= 25
+        && request.resource.data.get('category', null) is string
+        && request.resource.data.get('category', '').size() <= 80
+        && request.resource.data.get('message', null) is string
+        && request.resource.data.get('message', '').size() >= 5
+        && request.resource.data.get('message', '').size() <= 1500
+        && request.resource.data.get('status', '') == 'open'
+        && request.resource.data.get('source', null) is string
+        && request.resource.data.get('source', '').size() <= 60;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /customers/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name','email','emailVerified','createdAt','updatedAt']);
+      allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','emailVerified','updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+    match /adminLogs/{id} { allow read, create: if isAdmin(); allow update, delete: if false; }
+    match /reviews/{reviewId} { allow read: if true; allow create, update, delete: if isAdmin(); }
+
+    // Append-only Like events. Anonymous Auth users can create; no unlike/update/delete.
+    match /reviewLikes/{likeId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['reviewId','uid','visitId','createdAt'])
+        && request.resource.data.keys().hasOnly(['reviewId','uid','visitId','createdAt'])
+        && request.resource.data.get('uid', '') == request.auth.uid
+        && request.resource.data.get('reviewId', null) is string
+        && request.resource.data.get('visitId', null) is string
+        && request.resource.data.get('visitId', '').size() >= 12
+        && request.resource.data.get('visitId', '').size() <= 80
+        && exists(/databases/$(database)/documents/reviews/$(request.resource.data.get('reviewId', '')))
+        && get(/databases/$(database)/documents/reviews/$(request.resource.data.get('reviewId', ''))).data.active == true;
+      allow update, delete: if false;
+    }
+
+    match /reviewLikeAdjustments/{reviewId} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['count','updatedAt','updatedBy'])
+        && request.resource.data.get('count', -1) is int
+        && request.resource.data.get('count', -1) >= 0
+        && request.resource.data.get('count', -1) <= 100000000;
+      allow delete: if isAdmin();
+    }
+
+    match /enterpriseRecords/{recordId} { allow read, create, update, delete: if isAdmin(); }
+    match /{document=**} { allow read, write: if false; }
+  }
 }
