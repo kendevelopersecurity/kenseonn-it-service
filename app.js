@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   where
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, updateProfile, sendPasswordResetEmail, sendEmailVerification, reload, applyActionCode, verifyPasswordResetCode, confirmPasswordReset } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, updateProfile, sendPasswordResetEmail, reload, applyActionCode, verifyPasswordResetCode, confirmPasswordReset } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 const emailVerificationSettings = {
   url: "https://kendevelopersecurity.github.io/kenseonn-it-service/?emailVerification=1",
@@ -434,17 +434,21 @@ onAuthStateChanged(auth, async authUser => {
     await reload(user);
     currentLikeUser = auth.currentUser || user;
     currentCustomer = currentLikeUser;
-    if (!currentCustomer.emailVerified) {
-      if (authGuest) authGuest.classList.remove("hidden");
-      if (customerDashboard) customerDashboard.classList.add("hidden");
-      setText("customerLoginStatus", "Email belum diverifikasi. Buka tautan verifikasi terbaru di Gmail, lalu login kembali.");
-      renderReviews();
+    let memberProfile = null;
+    try { const profileSnap = await getDoc(doc(db, "customers", user.uid)); memberProfile = profileSnap.exists() ? profileSnap.data() : null; } catch (profileReadError) { console.warn("Member profile read:", profileReadError); }
+    if (memberProfile?.status === "disabled" || memberProfile?.archived === true) {
+      currentCustomer = null;
+      setText("customerLoginStatus", "Akun member dinonaktifkan. Hubungi admin Kenseonn.");
+      await signOut(auth);
       return;
     }
     if (authGuest) authGuest.classList.add("hidden");
     if (customerDashboard) customerDashboard.classList.remove("hidden");
     setText("customerName", user.displayName || "Pelanggan Kenseonn");
     setText("customerEmail", user.email || "");
+    setText("memberRank", memberProfile?.rank || "Member");
+    const memberServices = byId("memberServices");
+    if (memberServices) memberServices.innerHTML = services.map(item => `<article class="service-card"><h3>${esc(item.name || item.title || "Layanan")}</h3><p>${esc(item.description || "Layanan Kenseonn")}</p><a class="btn ghost" href="#order">Ajukan layanan</a></article>`).join("") || '<p>Layanan akan ditampilkan setelah katalog dimuat.</p>';
     const emailField = document.querySelector('#orderForm [name="email"]');
     if (emailField) { emailField.value = user.email || ""; emailField.readOnly = false; }
     const nameField = document.querySelector('#orderForm [name="name"]');
@@ -466,31 +470,30 @@ byId("registerForm")?.addEventListener("submit", async event => {
   if (button.disabled) return;
   try {
     button.disabled = true; setText("registerStatus", "Membuat akun...");
+    if (String(data.get("phone") || "").trim().length < 8) throw new Error("Nomor WhatsApp minimal 8 karakter.");
     const credential = await createUserWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password")));
     await updateProfile(credential.user, { displayName: String(data.get("name")).trim() });
-    // Kirim email verifikasi lebih dulu agar kegagalan tulis profil Firestore
-    // tidak membuat pengguna kehilangan kesempatan menerima tautan verifikasi.
-    await sendEmailVerification(credential.user, emailVerificationSettings);
     try {
       await setDoc(doc(db, "customers", credential.user.uid), {
         name: String(data.get("name")).trim(),
         email: credential.user.email,
+        phone: String(data.get("phone")).trim(),
         emailVerified: false,
+        rank: "Member",
+        status: "active",
         createdAt: serverTimestamp()
       }, { merge: true });
     } catch (profileError) {
       console.error("Profil pelanggan belum tersimpan:", profileError);
     }
-    await signOut(auth);
     form.reset();
-    setText("registerStatus", "Akun berhasil dibuat dan tautan verifikasi baru telah dikirim. Gunakan tautan TERBARU dari email Firebase. Jika tautan lama kedaluwarsa, abaikan dan buka email terbaru. Periksa Spam/Promosi.");
+    setText("registerStatus", "Pendaftaran berhasil! Akun member Anda sudah aktif dan otomatis masuk. Tidak perlu verifikasi email.");
   } catch(err) {
     const messages = {
       "auth/email-already-in-use": "Email sudah terdaftar. Masuk menggunakan akun tersebut.",
       "auth/invalid-email": "Format email tidak valid.",
       "auth/weak-password": "Password terlalu lemah. Gunakan minimal 8 karakter.",
       "auth/operation-not-allowed": "Pendaftaran Email/Password belum diaktifkan di Firebase Authentication.",
-      "auth/unauthorized-continue-uri": "Domain tautan verifikasi belum diizinkan. Tambahkan kendevelopersecurity.github.io ke Authorized domains Firebase Authentication.",
       "auth/too-many-requests": "Terlalu banyak percobaan. Tunggu sebentar sebelum mencoba lagi."
     };
     setText("registerStatus", `Pendaftaran gagal: ${messages[err.code] || err.code || err.message}`);
@@ -510,20 +513,9 @@ byId("customerLoginForm")?.addEventListener("submit", async event => {
     setText("customerLoginStatus", "Memproses login...");
     const credential = await signInWithEmailAndPassword(auth, String(data.get("email")).trim(), String(data.get("password")));
     await reload(credential.user);
-    if (!credential.user.emailVerified) {
-      try {
-        await sendEmailVerification(credential.user, emailVerificationSettings);
-        await signOut(auth);
-        setText("customerLoginStatus", "Email belum terverifikasi. Kami baru saja mengirim ulang tautan verifikasi. Gunakan email TERBARU dari Firebase; tautan lama yang kedaluwarsa tidak bisa dipakai.");
-      } catch (mailError) {
-        await signOut(auth).catch(() => {});
-        setText("customerLoginStatus", `Email belum terverifikasi dan pengiriman ulang gagal: ${mailError.code || mailError.message}. Periksa Authorized domains Firebase.`);
-      }
-      return;
-    }
     // Profile sync is best-effort; Firestore profile failure must not undo Firebase Auth login.
     try {
-      await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, emailVerified: true, updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(doc(db, "customers", credential.user.uid), { email: credential.user.email, updatedAt: serverTimestamp() }, { merge: true });
     } catch (profileError) {
       console.warn("Login OK; customer profile sync pending:", profileError);
       setText("customerLoginStatus", "Login berhasil. Profil belum tersinkron ke database; dashboard tetap dibuka.");

@@ -111,6 +111,16 @@
       <details><summary>Apakah data pelanggan aman?</summary><p>Order disimpan di Firebase Firestore. Akses order dibatasi untuk admin, sementara pengunjung hanya dapat membuat order baru. Tetap hindari memasukkan password, OTP, private key, atau data sensitif ke formulir.</p></details>
       <details><summary>Bagaimana cara order?</summary><p>Pilih layanan, isi detail kontak dan kebutuhan, lalu kirim. Admin akan menghubungi Anda untuk konfirmasi scope, harga, jadwal, dan ketentuan.</p></details>
     </section>
+<section id="member" class="section member-section">
+  <div id="authGuest" class="order-panel member-auth-grid">
+    <div><span class="kicker">MEMBER ACCESS</span><h2>Member Kenseonn</h2><p>Daftar menggunakan email, nomor WhatsApp, dan kata sandi. Akun langsung aktif tanpa verifikasi email.</p>
+      <form id="registerForm"><label>Nama lengkap<input name="name" required maxlength="80" autocomplete="name"></label><label>Email<input name="email" type="email" required maxlength="120" autocomplete="email"></label><label>Nomor WhatsApp<input name="phone" type="tel" required minlength="8" maxlength="25" placeholder="62812..." autocomplete="tel"></label><label>Kata sandi<input name="password" type="password" required minlength="8" autocomplete="new-password"></label><button class="btn primary" type="submit">Daftar Member</button><p id="registerStatus" class="form-status" aria-live="polite"></p><p class="form-status">Mengalami kendala saat login? Silakan hubungi admin melalui <a href="https://wa.me/62895636069948" target="_blank" rel="noopener">WhatsApp Admin Kenseonn</a>.</p></form>
+    </div>
+    <div><span class="kicker">MEMBER LOGIN</span><h2>Masuk Akun</h2><form id="customerLoginForm"><label>Email<input name="email" type="email" required autocomplete="username"></label><label>Kata sandi<input name="password" type="password" required autocomplete="current-password"></label><button class="btn primary" type="submit">Login</button><button class="btn ghost" id="customerResetPassword" type="button">Lupa password</button><p id="customerLoginStatus" class="form-status" aria-live="polite"></p><p class="form-status">Jika tidak bisa login ke akun member, hubungi <a href="https://wa.me/62895636069948" target="_blank" rel="noopener">Admin Kenseonn melalui WhatsApp</a>.</p></form></div>
+  </div>
+  <div id="customerDashboard" class="order-panel hidden"><div class="section-head"><div><span class="kicker">PRIVATE MEMBER AREA</span><h2>Member Dashboard</h2><p>Selamat datang, <b id="customerName"></b></p><p id="customerEmail"></p><p>Pangkat: <b id="memberRank">Member</b></p></div><button id="customerLogout" class="btn ghost" type="button">Keluar</button></div><h3>Layanan khusus member</h3><div id="memberServices" class="service-grid"></div><h3>Riwayat pesanan</h3><div id="customerOrders"></div></div>
+</section>
+
 <section id="order" class="section order-section">
       <div class="order-panel">
         <div><span class="kicker">05 / ORDER</span><h2>Request Service</h2><p>Isi detail layanan dan tautan publik yang relevan. Admin akan memeriksa pesanan secara manual. Jangan masukkan password, OTP, token, atau kredensial akun.</p></div>
