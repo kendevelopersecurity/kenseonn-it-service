@@ -729,3 +729,22 @@ document.addEventListener("click", async event => {
 
 // Keep Auto theme synchronized when the device appearance changes while the page is open.
 if (window.matchMedia) { const appearanceQuery=window.matchMedia("(prefers-color-scheme: dark)"); appearanceQuery.addEventListener?.("change",()=>{if(site.design?.theme==="auto")applyDesign();}); }
+
+
+// KENSEONN PRESIDENTIAL PUBLIC MOTION: reveal newly rendered cards on scroll.
+(function initPublicPresidentialMotion(){
+  if(!('IntersectionObserver' in window)) return;
+  const selector='.service-card,.price-card,.review-card,.about-card,.contact-card,.order-panel';
+  const seen=new WeakSet();
+  const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
+    if(entry.isIntersecting){entry.target.classList.add('motion-ready');observer.unobserve(entry.target);}
+  }),{threshold:.08,rootMargin:'0px 0px -30px 0px'});
+  const scan=node=>{
+    if(node.nodeType!==1)return;
+    if(node.matches?.(selector) && !seen.has(node)){seen.add(node);observer.observe(node);}
+    node.querySelectorAll?.(selector).forEach(el=>{if(!seen.has(el)){seen.add(el);observer.observe(el);}});
+  };
+  scan(document.documentElement);
+  const mutation=new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(scan)));
+  mutation.observe(document.body,{childList:true,subtree:true});
+})();

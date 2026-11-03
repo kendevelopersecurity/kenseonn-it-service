@@ -1054,3 +1054,77 @@ $("resetAdminSkin")?.addEventListener("click",()=>applyAdminSkin("obsidian"));
 
 // Expanded system diagnostics: real browser checks and Firestore reads, not decorative status labels.
 $("runSystemDeepCheck")?.addEventListener("click",async()=>{const out=$("systemDeepResult");out.textContent="Menjalankan pemeriksaan...";const checks=[];const test=(name,ok,detail)=>checks.push({name,ok,detail});test("Firebase Auth session",!!auth.currentUser,auth.currentUser?"Admin session aktif":"Tidak ada sesi admin aktif");try{const checksData=await Promise.allSettled([getDoc(doc(db,"siteConfig","main")),getDocs(collection(db,"services")),getDocs(collection(db,"packages")),getDocs(collection(db,"reviews")),getDocs(collection(db,"reviewLikes")),getDocs(collection(db,"orders")),getDocs(collection(db,"supportTickets")),getDocs(collection(db,"enterpriseRecords")),getDocs(collection(db,"adminLogs"))]);const labels=["Site configuration","Services","Packages","Reviews","Review Like events","Orders","Support tickets","Enterprise records","Admin audit logs"];checksData.forEach((r,i)=>{const ok=r.status==="fulfilled";const val=ok?(i===0?(r.value.exists()?"Dokumen siteConfig/main tersedia":"Dokumen belum dibuat"):(`${r.value.size} dokumen/event`)):(r.reason?.code||r.reason?.message||"Gagal dibaca");test(labels[i],ok && (i!==0||r.value.exists()),val);});}catch(e){test("Firestore diagnostics",false,e.code||e.message);}try{const paths=["index.html","styles.css","app.js","admin.html","admin.js","admin-premium.css","firebase-config.js"];const assetResults=await Promise.all(paths.map(async p=>{const r=await fetch(p,{cache:"no-store"});return {p,ok:r.ok,status:r.status};}));assetResults.forEach(x=>test("Asset "+x.p,x.ok,x.ok?"HTTP "+x.status:"HTTP "+x.status+" — periksa deploy/path"));}catch(e){test("Website assets",false,e.message||"Fetch gagal");}test("Browser storage",!!window.sessionStorage&&!!window.localStorage,"Storage browser tersedia");test("Reduced motion support",!!window.matchMedia,"Preferensi aksesibilitas dapat diperiksa");out.innerHTML=checks.map(c=>`<div class="diagnostic-row"><b>${c.ok?"✓":"✕"} ${esc(c.name)}</b><small>${esc(c.detail)}</small></div>`).join("");logActivity("Menjalankan deep system check");});
+
+
+// PRESIDENTIAL SUITE MOTION LAYER
+(function initPresidentialMotion(){
+  const loader = document.getElementById('presidentialLoader');
+  const showLoader = () => { if(loader){ loader.classList.add('is-active'); } };
+  const hideLoader = () => { if(loader){ loader.classList.remove('is-active'); } };
+  window.addEventListener('load',()=>setTimeout(hideLoader,450),{once:true});
+  document.addEventListener('click',event=>{
+    const target=event.target.closest('button,a,[data-pane]');
+    if(!target)return;
+    if(target.matches('button[type="submit"]') || target.id==='logoutBtn' || target.classList.contains('admin-tab')){
+      showLoader(); setTimeout(hideLoader,650);
+    }
+    const rect=target.getBoundingClientRect();
+    const size=Math.max(rect.width,rect.height)*1.25;
+    const ripple=document.createElement('span');
+    ripple.className='pres-ripple';
+    ripple.style.width=ripple.style.height=size+'px';
+    ripple.style.left=(event.clientX-rect.left-size/2)+'px';
+    ripple.style.top=(event.clientY-rect.top-size/2)+'px';
+    if(getComputedStyle(target).position==='static')target.style.position='relative';
+    target.appendChild(ripple);setTimeout(()=>ripple.remove(),700);
+  },{passive:true});
+  if('IntersectionObserver' in window){
+    const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
+      if(entry.isIntersecting){entry.target.classList.add('motion-ready');observer.unobserve(entry.target);}
+    }),{threshold:.08,rootMargin:'0px 0px -35px 0px'});
+    const selector='.admin-card,.glass-stat,.glass-panel,.tool-card,.enterprise-module-card';
+    const seen=new WeakSet();
+    const scan=node=>{if(node.nodeType!==1)return;if(node.matches?.(selector)&&!seen.has(node)){seen.add(node);observer.observe(node);}node.querySelectorAll?.(selector).forEach(el=>{if(!seen.has(el)){seen.add(el);observer.observe(el);}});};
+    scan(document.documentElement);
+    new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(scan))).observe(document.body,{childList:true,subtree:true});
+  }
+})();
+
+// ADMIN DATA VAULT: destructive operations require two explicit confirmations.
+const bulkDeleteLabels={orders:'seluruh pesanan',supportTickets:'seluruh tiket bantuan',customers:'seluruh profil pelanggan',reviews:'seluruh ulasan',services:'seluruh layanan',packages:'seluruh paket',enterpriseRecords:'seluruh catatan Enterprise',reviewLikes:'seluruh riwayat Like',adminLogs:'seluruh Audit Log'};
+async function clearFirestoreCollection(collectionName){
+  const label=bulkDeleteLabels[collectionName];
+  if(!label || !auth.currentUser) throw new Error('Aksi tidak tersedia atau sesi admin tidak aktif.');
+  const first=confirm(`PERINGATAN: Kamu akan menghapus ${label} dari Firestore. Tindakan ini permanen. Unduh backup terlebih dahulu. Lanjutkan?`);
+  if(!first)return;
+  const second=prompt(`Konfirmasi kedua. Ketik HAPUS untuk menghapus ${label}.`);
+  if(second!=='HAPUS')return;
+  const status=$('dataVaultStatus');
+  if(status)status.textContent=`Memuat ${label}...`;
+  const snap=await getDocs(collection(db,collectionName));
+  let deleted=0;
+  const docs=snap.docs;
+  for(let i=0;i<docs.length;i+=20){
+    const group=docs.slice(i,i+20);
+    await Promise.all(group.map(item=>deleteDoc(doc(db,collectionName,item.id))));
+    deleted+=group.length;
+    if(status)status.textContent=`Menghapus ${label}: ${deleted}/${docs.length}...`;
+  }
+  if(status)status.textContent=`Selesai. ${deleted} dokumen dihapus dari ${collectionName}.`;
+  if(collectionName!=='adminLogs') logActivity(`Menghapus ${deleted} dokumen dari ${collectionName}`);
+  if(collectionName==='orders')await loadOrders();
+  if(collectionName==='services')await loadServices();
+  if(collectionName==='packages')await loadPackages();
+  if(collectionName==='supportTickets')await loadTickets();
+  if(collectionName==='reviews')await loadReviews();
+  if(collectionName==='adminLogs')await loadAdminLogs();
+  if(collectionName==='enterpriseRecords')await loadEnterpriseRecords();
+  if(collectionName==='reviewLikes')await loadReviews();
+  if(collectionName==='customers' && typeof loadCustomers==='function')await loadCustomers();
+}
+document.querySelectorAll('[data-clear-collection]').forEach(button=>button.addEventListener('click',async()=>{
+  const name=button.dataset.clearCollection;
+  const idle=button.textContent;button.disabled=true;button.textContent='Memproses...';
+  try{await clearFirestoreCollection(name);}catch(error){showStatus('dataVaultStatus',showError('Penghapusan gagal',error));}
+  finally{button.disabled=false;button.textContent=idle;}
+}));

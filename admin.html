@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="admin-premium.css">
 </head>
 <body class="admin-body">
+  <div class="presidential-loader" id="presidentialLoader" aria-hidden="true"><div class="loader-core"><span class="loader-emblem">K</span><b>KENSEONN</b><small>SECURE COMMAND SYSTEM</small><i></i></div></div>
   <div class="bg-grid"></div>
   <main class="admin-wrap">
     <section id="loginView" class="auth-card">
@@ -244,6 +245,21 @@
           <div class="tool-card"><h3>Export katalog</h3><p>Unduh daftar layanan dan paket.</p><button id="exportCatalog" class="btn ghost">Export katalog CSV</button></div>
           <div class="tool-card"><h3>Maintenance mode</h3><p>Pengaturan tersedia pada tab Website. Admin tetap dapat login.</p><button class="btn ghost" data-jump="sitePane">Buka pengaturan</button></div>
         </div></div>
+        <div class="admin-card data-vault-card">
+          <span class="kicker">PRESIDENTIAL DATA VAULT</span><h2>Pengelolaan & Penghapusan Riwayat</h2>
+          <p class="muted-note">Gunakan backup sebelum menghapus. Penghapusan bersifat permanen dan tidak dapat dibatalkan. Data akun Firebase Authentication tidak ikut terhapus.</p>
+          <div class="data-vault-grid">
+            <article><b>Pesanan</b><small>Semua dokumen order</small><button class="btn danger" data-clear-collection="orders">Hapus semua pesanan</button></article>
+            <article><b>Tiket bantuan</b><small>Semua tiket dan balasan</small><button class="btn danger" data-clear-collection="supportTickets">Hapus semua tiket</button></article>
+            <article><b>Pelanggan</b><small>Profil Firestore saja, bukan akun Auth</small><button class="btn danger" data-clear-collection="customers">Hapus profil pelanggan</button></article>
+            <article><b>Ulasan</b><small>Semua ulasan pelanggan</small><button class="btn danger" data-clear-collection="reviews">Hapus semua ulasan</button></article>
+            <article><b>Layanan</b><small>Katalog layanan website</small><button class="btn danger" data-clear-collection="services">Hapus semua layanan</button></article>
+            <article><b>Paket & harga</b><small>Katalog paket boosting</small><button class="btn danger" data-clear-collection="packages">Hapus semua paket</button></article>
+            <article><b>Enterprise records</b><small>Seluruh catatan 20 modul</small><button class="btn danger" data-clear-collection="enterpriseRecords">Hapus semua catatan</button></article>
+            <article><b>Riwayat Like & Audit</b><small>Hapus oleh admin setelah Rules V3.1 diterbitkan</small><button class="btn danger" data-clear-collection="reviewLikes">Hapus semua Like</button><button class="btn danger" data-clear-collection="adminLogs">Hapus semua audit log</button></article>
+          </div>
+          <div id="dataVaultStatus" class="form-status" aria-live="polite"></div>
+        </div>
         <div class="admin-card"><h2>Activity log (sesi ini)</h2><div id="activityLog" class="activity-log"><p>Belum ada aktivitas.</p></div><button id="clearActivity" class="btn ghost">Bersihkan log lokal</button></div>
       </div>
         </main>

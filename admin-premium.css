@@ -237,3 +237,46 @@ body[data-admin-skin="adaptive"] .admin-tab.active{background:linear-gradient(10
 @media(max-width:760px){.glass-welcome{min-height:205px}.glass-orb{flex-basis:78px;width:78px;height:78px;border-radius:25px}.glass-orb span{font-size:42px}.glass-welcome-foot{font-size:7px}.glass-main-grid{grid-template-columns:1fr}.glass-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.glass-modules-panel .capability-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.glass-section-heading{align-items:flex-start}.glass-live{font-size:8px}}
 @media(max-width:430px){.glass-stat{padding:13px;min-height:132px}.glass-stat>b{font-size:25px}.glass-welcome{padding:19px}.glass-orb{display:none}.glass-welcome-foot{left:19px;right:19px}.glass-panel{padding:15px}}
 @media(prefers-reduced-motion:reduce){.glass-orb i,.glass-orb b{animation:none}.glass-stat,.glass-quick{transition:none}}
+
+
+/* KENSEONN PRESIDENTIAL SUITE — motion, glass, editorial cards */
+:root{--pres-gold:#d8bd83;--pres-cyan:#78e6df;--pres-violet:#b7a0ff}
+html{scroll-behavior:smooth}
+body{scrollbar-color:rgba(183,160,255,.45) transparent}
+.presidential-loader{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,rgba(92,77,148,.24),transparent 35%),rgba(3,6,12,.94);backdrop-filter:blur(18px);opacity:0;visibility:hidden;transition:opacity .35s ease,visibility .35s ease;pointer-events:none}
+.presidential-loader.is-active{opacity:1;visibility:visible}
+.loader-core{position:relative;display:grid;justify-items:center;gap:10px;padding:34px 42px;border:1px solid rgba(216,189,131,.35);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.09),rgba(255,255,255,.015));box-shadow:0 25px 90px rgba(0,0,0,.45),0 0 55px rgba(183,160,255,.12);overflow:hidden}
+.loader-core:before{content:"";position:absolute;inset:-80% -30%;background:linear-gradient(110deg,transparent 44%,rgba(255,255,255,.24) 50%,transparent 56%);animation:presSweep 2.1s ease-in-out infinite}
+.loader-emblem{display:grid;place-items:center;width:58px;height:58px;border:1px solid var(--pres-gold);border-radius:18px;color:#f4e6c7;font-size:26px;font-weight:900;box-shadow:0 0 30px rgba(216,189,131,.28);animation:presPulse 1.6s ease-in-out infinite}
+.loader-core b{font-size:13px;letter-spacing:.24em;color:#f6f0e5}.loader-core small{font-size:8px;letter-spacing:.2em;color:#aeb9ca}.loader-core i{width:130px;height:2px;border-radius:9px;background:linear-gradient(90deg,transparent,var(--pres-gold),var(--pres-violet),transparent);transform-origin:left;animation:presLine 1.25s ease-in-out infinite}
+@keyframes presSweep{0%,20%{transform:translateX(-80%) rotate(12deg)}80%,100%{transform:translateX(80%) rotate(12deg)}}@keyframes presPulse{50%{transform:translateY(-4px) scale(1.04);box-shadow:0 0 42px rgba(216,189,131,.42)}}@keyframes presLine{0%{transform:scaleX(.12);opacity:.45}50%{transform:scaleX(1);opacity:1}100%{transform:scaleX(.12);opacity:.45}}
+/* Scroll reveal: cards enter softly as they appear in view. */
+.motion-ready .admin-card,.motion-ready .glass-stat,.motion-ready .glass-panel,.motion-ready .service-card,.motion-ready .price-card,.motion-ready .review-card,.motion-ready .about-card,.motion-ready .contact-card,.motion-ready .order-panel{animation:presCardIn .65s cubic-bezier(.2,.75,.2,1) both}
+@keyframes presCardIn{from{opacity:.35;transform:translateY(18px) scale(.985);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
+.admin-body .admin-card,.admin-body .glass-stat,.admin-body .glass-panel,.admin-body .tool-card,.admin-body .enterprise-module-card{position:relative;isolation:isolate;overflow:hidden;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 55px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.055);transition:transform .32s cubic-bezier(.2,.8,.2,1),border-color .32s,box-shadow .32s}
+.admin-body .admin-card:before,.admin-body .glass-stat:before,.admin-body .glass-panel:before,.admin-body .tool-card:before,.admin-body .enterprise-module-card:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(115deg,transparent 20%,rgba(255,255,255,.055) 48%,transparent 70%);transform:translateX(-120%);transition:transform .8s ease}
+.admin-body .admin-card:hover:before,.admin-body .glass-stat:hover:before,.admin-body .glass-panel:hover:before,.admin-body .tool-card:hover:before,.admin-body .enterprise-module-card:hover:before{transform:translateX(120%)}
+.admin-body .admin-card:hover,.admin-body .glass-stat:hover,.admin-body .glass-panel:hover,.admin-body .tool-card:hover,.admin-body .enterprise-module-card:hover{transform:translateY(-4px);border-color:rgba(216,189,131,.34);box-shadow:0 24px 65px rgba(0,0,0,.32),0 0 25px rgba(183,160,255,.08)}
+.admin-body .admin-header{position:relative}.admin-body .admin-header:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--pres-gold),var(--pres-violet),transparent);opacity:.7}
+.admin-body .brand,.admin-body .brand-mark,.admin-body .admin-header h1{ text-shadow:0 0 22px rgba(183,160,255,.18)}
+.admin-body .brand-mark{animation:presPulse 4s ease-in-out infinite,logo-sweep 5s ease-in-out infinite}
+.admin-body .admin-tab{position:relative;overflow:hidden;transition:transform .22s ease,background .22s ease,border-color .22s ease}
+.admin-body .admin-tab:hover{transform:translateX(4px)}
+.admin-body button,.admin-body a,.btn{ -webkit-tap-highlight-color:transparent}
+.admin-body button:active,.admin-body .btn:active{transform:scale(.975)}
+.pres-ripple{position:absolute;border-radius:50%;pointer-events:none;background:rgba(216,189,131,.24);transform:scale(0);animation:presRipple .65s ease-out forwards}
+@keyframes presRipple{to{transform:scale(1);opacity:0}}
+.data-vault-card{border-color:rgba(216,189,131,.25)!important;background:linear-gradient(145deg,rgba(33,29,42,.94),rgba(10,15,25,.96))!important}
+.data-vault-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
+.data-vault-grid article{display:grid;gap:7px;padding:16px;border:1px solid rgba(255,255,255,.09);border-radius:15px;background:rgba(255,255,255,.035)}
+.data-vault-grid article b{color:#f2e7d0}.data-vault-grid article small{color:var(--admin-muted);min-height:28px}.data-vault-grid article button{width:100%;margin-top:4px}
+.admin-pane{animation:presPaneIn .38s ease both}@keyframes presPaneIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* Public brand/card treatment. */
+.brand-name-wrap #brandName{background-image:linear-gradient(100deg,#fff 0%,#d8bd83 22%,#b7a0ff 42%,#fff 54%,#78e6df 72%,#fff 100%);background-size:260% auto;animation:brand-shimmer 4s linear infinite,presBrandLift 5s ease-in-out infinite;text-shadow:0 0 28px rgba(183,160,255,.25)}
+.brand-mark{box-shadow:0 0 0 1px rgba(216,189,131,.2),0 0 32px rgba(183,160,255,.2),inset 0 1px 0 rgba(255,255,255,.35)}
+@keyframes presBrandLift{0%,100%{filter:drop-shadow(0 0 0 rgba(216,189,131,0))}50%{filter:drop-shadow(0 0 9px rgba(216,189,131,.35))}}
+.service-card,.price-card,.review-card,.about-card,.contact-card,.order-panel{position:relative;isolation:isolate;overflow:hidden;box-shadow:0 16px 42px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.045)}
+.service-card:after,.price-card:after,.review-card:after,.about-card:after,.contact-card:after,.order-panel:after{content:"";position:absolute;inset:-120% -40%;z-index:-1;pointer-events:none;background:linear-gradient(110deg,transparent 45%,rgba(255,255,255,.075) 50%,transparent 55%);transform:translateX(-45%) rotate(8deg);transition:transform .9s ease}
+.service-card:hover:after,.price-card:hover:after,.review-card:hover:after,.about-card:hover:after,.contact-card:hover:after,.order-panel:hover:after{transform:translateX(45%) rotate(8deg)}
+@media(max-width:640px){.data-vault-grid{grid-template-columns:1fr}.loader-core{padding:28px 30px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.presidential-loader{display:none!important}}
