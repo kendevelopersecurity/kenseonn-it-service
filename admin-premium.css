@@ -141,3 +141,99 @@ body[data-admin-skin="adaptive"]{--admin-accent:#75e8d2;--admin-blue:#a7a0ff;--a
 body[data-admin-skin="adaptive"] .admin-sidebar,body[data-admin-skin="adaptive"] .admin-card{background:linear-gradient(145deg,#1b2938,#0c1721);border-color:color-mix(in srgb,#75e8d2 23%,transparent)}
 body[data-admin-skin="adaptive"] .admin-tab.active{background:linear-gradient(100deg,color-mix(in srgb,#75e8d2 20%,transparent),color-mix(in srgb,#a7a0ff 12%,transparent));box-shadow:inset 3px 0 0 #75e8d2}
 .admin-skin-preview[data-skin="adaptive"]{background:linear-gradient(125deg,#1b2938,#0c1721);border-color:#75e8d2;box-shadow:0 0 24px color-mix(in srgb,#75e8d2 15%,transparent)}.admin-skin-preview[data-skin="adaptive"] span{color:#75e8d2}
+
+
+/* ==========================================================
+   KENSEONN GLASSY COMMAND CENTER V3
+   Presentation upgrade only: keeps existing Firebase logic.
+   ========================================================== */
+.admin-body{
+  background:
+    radial-gradient(ellipse at 8% 5%,rgba(143,104,255,.20),transparent 34%),
+    radial-gradient(ellipse at 92% 12%,rgba(68,224,174,.13),transparent 30%),
+    radial-gradient(ellipse at 55% 90%,rgba(73,147,255,.10),transparent 38%),
+    #05070c;
+}
+.admin-body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.24;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:38px 38px;mask-image:linear-gradient(to bottom,black,transparent 88%);
+}
+#dashboard{position:relative;z-index:1}
+.admin-header{
+  padding:18px 20px 22px;margin-bottom:18px;border:1px solid rgba(255,255,255,.12);
+  border-radius:22px;background:linear-gradient(120deg,rgba(255,255,255,.10),rgba(255,255,255,.025));
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  box-shadow:0 18px 55px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.10);
+}
+.admin-header h1{letter-spacing:-.055em}
+.admin-sidebar{
+  background:linear-gradient(155deg,rgba(24,31,48,.78),rgba(8,13,23,.76))!important;
+  border-color:rgba(255,255,255,.14)!important;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  box-shadow:0 22px 65px rgba(0,0,0,.30),inset 0 1px rgba(255,255,255,.08)!important;
+}
+.admin-content{min-width:0}
+.glass-overview{display:grid;gap:17px}
+.glass-welcome{
+  position:relative;overflow:hidden;min-height:210px;padding:clamp(22px,3vw,34px);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  border:1px solid rgba(255,255,255,.19);border-radius:24px;
+  background:linear-gradient(112deg,rgba(255,255,255,.16),rgba(255,255,255,.045) 48%,rgba(130,105,255,.12)),
+    radial-gradient(circle at 82% 35%,rgba(99,230,190,.16),transparent 33%);
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  box-shadow:0 22px 70px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.22);
+}
+.glass-welcome:after{content:"";position:absolute;width:300px;height:300px;right:10%;top:-210px;border-radius:50%;border:1px solid rgba(255,255,255,.13);box-shadow:0 0 0 28px rgba(255,255,255,.025),0 0 0 58px rgba(255,255,255,.018)}
+.glass-welcome-copy{position:relative;z-index:1;max-width:620px}
+.glass-eyebrow{display:flex;align-items:center;gap:9px;color:#b8f4dc;font-size:9px;font-weight:900;letter-spacing:.19em}
+.glass-eyebrow i,.glass-live i{width:7px;height:7px;border-radius:50%;background:#67f2b5;box-shadow:0 0 14px #67f2b5}
+.glass-welcome h2{font-size:clamp(25px,3.3vw,39px);letter-spacing:-.055em;margin:13px 0 7px;color:#f4f7ff}
+.glass-welcome p{max-width:520px;color:#b7c3d6;font-size:12px;line-height:1.8;margin:0}
+.glass-welcome-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:19px}
+.glass-primary,.glass-secondary{border-radius:12px;padding:11px 15px;font-size:11px;font-weight:850;cursor:pointer}
+.glass-primary{border:1px solid rgba(131,255,203,.38);background:linear-gradient(120deg,#72e8b6,#8de5df);color:#07130f;box-shadow:0 8px 24px rgba(80,227,177,.17)}
+.glass-primary span{margin-left:12px}
+.glass-secondary{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#e8eefb}
+.glass-orb{position:relative;z-index:1;flex:0 0 130px;width:130px;height:130px;border-radius:38px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.30);background:linear-gradient(145deg,rgba(255,255,255,.25),rgba(255,255,255,.035));box-shadow:inset 0 1px rgba(255,255,255,.4),0 18px 50px rgba(0,0,0,.25);transform:rotate(-8deg)}
+.glass-orb span{font-size:66px;font-weight:900;color:#e6d9ff;text-shadow:0 0 28px rgba(168,132,255,.8)}
+.glass-orb i,.glass-orb b{position:absolute;border-radius:50%;border:1px solid rgba(134,242,205,.35);inset:-13px;animation:glassOrbit 12s linear infinite}
+.glass-orb b{inset:-25px;border-color:rgba(173,146,255,.23);animation-direction:reverse;animation-duration:18s}
+@keyframes glassOrbit{to{transform:rotate(360deg)}}
+.glass-welcome-foot{position:absolute;left:clamp(22px,3vw,34px);right:clamp(22px,3vw,34px);bottom:12px;display:flex;justify-content:space-between;color:#7f91a9;font-size:8px;font-weight:900;letter-spacing:.13em}
+.glass-section-heading,.glass-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.glass-section-heading{padding:3px 2px 0}
+.glass-section-heading h2,.glass-panel-head h2{font-size:19px;letter-spacing:-.035em;margin:4px 0 0;color:#f0f4ff}
+.glass-live{display:flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid rgba(103,242,181,.19);border-radius:999px;background:rgba(103,242,181,.06);color:#b8f4dc;font-size:9px;font-weight:800}
+.glass-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.glass-stat{position:relative;isolation:isolate;overflow:hidden;min-height:145px;padding:17px;border:1px solid rgba(255,255,255,.14);border-radius:19px;background:linear-gradient(145deg,rgba(255,255,255,.13),rgba(255,255,255,.035));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 16px 42px rgba(0,0,0,.20),inset 0 1px rgba(255,255,255,.12);transition:transform .25s,border-color .25s}
+.glass-stat:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.29)}
+.glass-stat-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;margin-bottom:12px;background:rgba(255,255,255,.10);font-size:16px;color:#d7dfff}
+.glass-stat .stat-label{font-size:8px;color:#9eacc1;letter-spacing:.15em;font-weight:900}
+.glass-stat>b{display:block;margin:7px 0 4px;font-size:clamp(24px,2.5vw,32px);letter-spacing:-.06em;color:#fff}
+.glass-stat small{font-size:9px;color:#91a0b5}
+.glass-stat-glow{position:absolute;z-index:-1;width:120px;height:120px;right:-45px;bottom:-55px;border-radius:50%;filter:blur(24px);opacity:.32}
+.glass-stat-violet .glass-stat-glow{background:#9b7cff}.glass-stat-green .glass-stat-glow{background:#55e7b0}.glass-stat-blue .glass-stat-glow{background:#65b9ff}.glass-stat-orange .glass-stat-glow{background:#ffb66e}
+.glass-main-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr);gap:13px}
+.glass-panel{min-width:0;padding:19px;border:1px solid rgba(255,255,255,.14);border-radius:20px;background:linear-gradient(145deg,rgba(255,255,255,.105),rgba(255,255,255,.028));backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 17px 48px rgba(0,0,0,.20),inset 0 1px rgba(255,255,255,.10)}
+.glass-panel-mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.14);border-radius:12px;color:#b9a5ff;background:rgba(255,255,255,.06)}
+.glass-quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:15px}
+.glass-quick{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:94px;padding:12px;border:1px solid rgba(255,255,255,.105);border-radius:14px;background:rgba(8,13,23,.34);color:#edf2ff;text-align:left;cursor:pointer;transition:.2s}
+.glass-quick:hover{transform:translateY(-3px);border-color:rgba(135,236,204,.38);background:rgba(112,224,185,.075)}
+.glass-quick>span{display:grid;place-items:center;width:26px;height:26px;border-radius:9px;background:rgba(151,126,255,.16);color:#cbbcff;font-size:15px}
+.glass-quick b{font-size:10px}.glass-quick small{font-size:8px;color:#8f9db2}
+.glass-revenue-value{margin-top:17px;padding:14px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(5,10,18,.28)}
+.glass-revenue-value span,.glass-mini-metrics span{display:block;color:#91a0b5;font-size:9px}
+.glass-revenue-value b{display:block;margin-top:5px;color:#83edc1;font-size:25px;letter-spacing:-.05em}
+.glass-mini-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.glass-mini-metrics>div{padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.035)}
+.glass-mini-metrics b{display:block;margin-top:5px;color:#f0f4ff;font-size:15px}.glass-mini-metrics .glass-secure{font-size:11px;color:#83edc1}
+.glass-bars{height:54px;display:flex;align-items:flex-end;gap:5px;margin-top:15px;padding:0 2px}
+.glass-bars i{flex:1;min-width:4px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#a89aff,#57dfb2);opacity:.72}
+.glass-disclaimer{display:block;margin-top:9px;color:#74839a;font-size:8px;line-height:1.5}
+.glass-modules-panel .glass-panel-head{margin-bottom:13px}.glass-panel-head p{font-size:10px;color:#8e9db2;margin:5px 0 0}
+.glass-modules-panel .capability-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.glass-modules-panel .capability-item{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.09);border-radius:11px;padding:10px;color:#bdc9da}
+@media(max-width:1050px){.glass-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.glass-modules-panel .capability-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.glass-welcome{min-height:205px}.glass-orb{flex-basis:78px;width:78px;height:78px;border-radius:25px}.glass-orb span{font-size:42px}.glass-welcome-foot{font-size:7px}.glass-main-grid{grid-template-columns:1fr}.glass-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.glass-modules-panel .capability-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.glass-section-heading{align-items:flex-start}.glass-live{font-size:8px}}
+@media(max-width:430px){.glass-stat{padding:13px;min-height:132px}.glass-stat>b{font-size:25px}.glass-welcome{padding:19px}.glass-orb{display:none}.glass-welcome-foot{left:19px;right:19px}.glass-panel{padding:15px}}
+@media(prefers-reduced-motion:reduce){.glass-orb i,.glass-orb b{animation:none}.glass-stat,.glass-quick{transition:none}}

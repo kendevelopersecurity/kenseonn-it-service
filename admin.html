@@ -50,10 +50,54 @@
         </aside>
         <main class="admin-content">
 
-      <div id="overviewPane" class="admin-pane">
-        <div class="admin-stats"><div><span class="stat-label">TOTAL PESANAN</span><b id="statOrders">0</b><small>Semua pesanan tersimpan</small></div><div><span class="stat-label">LAYANAN AKTIF</span><b id="statServices">0</b><small>Katalog layanan</small></div><div><span class="stat-label">PAKET TERSEDIA</span><b id="statPackages">0</b><small>Harga dari Firestore</small></div></div>
-        <div class="admin-card"><div class="section-head"><div><span class="kicker">COMMAND CENTER</span><h2>Operational overview</h2></div><span class="live-pill">● FIREBASE CONNECTED</span></div><p>Kelola katalog, pesanan manual, desain, dan operasional dari satu tempat.</p><div class="quick-grid"><button class="quick-action" data-jump="ordersPane">Buka pesanan</button><button class="quick-action" data-jump="packagesPane">Kelola harga</button><button class="quick-action" data-jump="designPane">Atur tampilan</button><button class="quick-action" data-jump="analyticsPane">Lihat analytics</button></div><div class="admin-stats extra-stats"><div><b id="statNew">0</b><span>Pesanan baru</span></div><div><b id="statDone">0</b><span>Selesai</span></div><div><b id="statRevenue">Rp 0</b><span>Nilai order berstatus paid/done*</span></div></div><small>*Nilai dihitung dari harga paket yang dicantumkan dalam detail pesanan bila tersedia; bukan laporan pembayaran terverifikasi.</small></div>
-        <div class="admin-card"><h2>Operational modules yang aktif</h2><div class="capability-grid" id="capabilityGrid"></div></div>
+      <div id="overviewPane" class="admin-pane glass-overview">
+        <section class="glass-welcome">
+          <div class="glass-welcome-copy">
+            <span class="glass-eyebrow"><i></i> KENSEONN DIGITAL OPERATIONS</span>
+            <h2>Selamat datang kembali, Admin.</h2>
+            <p>Pusat kendali layanan, pesanan, pelanggan, dan performa Kenseonn dalam satu tampilan.</p>
+            <div class="glass-welcome-actions">
+              <button class="glass-primary" data-jump="ordersPane">Lihat pesanan <span>↗</span></button>
+              <button class="glass-secondary" data-jump="analyticsPane">Buka analitik</button>
+            </div>
+          </div>
+          <div class="glass-orb" aria-hidden="true"><span>K</span><i></i><b></b></div>
+          <div class="glass-welcome-foot"><span>● FIREBASE WORKSPACE</span><span>ADMIN CONTROL CENTER · V3</span></div>
+        </section>
+
+        <div class="glass-section-heading"><div><span class="kicker">LIVE BUSINESS SNAPSHOT</span><h2>Ringkasan operasional</h2></div><span class="glass-live"><i></i> Dashboard aktif</span></div>
+        <div class="glass-stat-grid">
+          <article class="glass-stat glass-stat-violet"><span class="glass-stat-icon">▤</span><span class="stat-label">TOTAL PESANAN</span><b id="statOrders">0</b><small>Semua pesanan tersimpan</small><i class="glass-stat-glow"></i></article>
+          <article class="glass-stat glass-stat-green"><span class="glass-stat-icon">✦</span><span class="stat-label">LAYANAN AKTIF</span><b id="statServices">0</b><small>Katalog layanan</small><i class="glass-stat-glow"></i></article>
+          <article class="glass-stat glass-stat-blue"><span class="glass-stat-icon">▦</span><span class="stat-label">PAKET TERSEDIA</span><b id="statPackages">0</b><small>Harga dari Firestore</small><i class="glass-stat-glow"></i></article>
+          <article class="glass-stat glass-stat-orange"><span class="glass-stat-icon">◷</span><span class="stat-label">PESANAN BARU</span><b id="statNew">0</b><small>Perlu ditindaklanjuti</small><i class="glass-stat-glow"></i></article>
+        </div>
+
+        <div class="glass-main-grid">
+          <section class="glass-panel glass-quick-panel">
+            <div class="glass-panel-head"><div><span class="kicker">QUICK ACCESS</span><h2>Akses cepat</h2></div><span class="glass-panel-mark">✧</span></div>
+            <div class="glass-quick-grid">
+              <button class="glass-quick" data-jump="ordersPane"><span>⇄</span><b>Pesanan</b><small>Kelola permintaan masuk</small></button>
+              <button class="glass-quick" data-jump="packagesPane"><span>◇</span><b>Boosting & harga</b><small>Atur katalog paket</small></button>
+              <button class="glass-quick" data-jump="reviewsPane"><span>★</span><b>Ulasan & Like</b><small>Kelola testimoni</small></button>
+              <button class="glass-quick" data-jump="designPane"><span>◈</span><b>Design Lab</b><small>Atur tampilan website</small></button>
+              <button class="glass-quick" data-jump="ticketsPane"><span>✉</span><b>Tiket bantuan</b><small>Balas pesan pelanggan</small></button>
+              <button class="glass-quick" data-jump="systemPane"><span>⌁</span><b>System Tools</b><small>Periksa kesehatan sistem</small></button>
+            </div>
+          </section>
+          <section class="glass-panel glass-revenue-panel">
+            <div class="glass-panel-head"><div><span class="kicker">BUSINESS PERFORMANCE</span><h2>Performa bisnis</h2></div><span class="glass-panel-mark">↗</span></div>
+            <div class="glass-revenue-value"><span>Nilai order paid / done</span><b id="statRevenue">Rp 0</b></div>
+            <div class="glass-mini-metrics"><div><span>Pesanan selesai</span><b id="statDone">0</b></div><div><span>Status data</span><b class="glass-secure">Terhubung</b></div></div>
+            <div class="glass-bars" aria-hidden="true"><i style="height:28%"></i><i style="height:44%"></i><i style="height:36%"></i><i style="height:62%"></i><i style="height:52%"></i><i style="height:78%"></i><i style="height:66%"></i><i style="height:92%"></i><i style="height:72%"></i><i style="height:100%"></i><i style="height:82%"></i><i style="height:90%"></i></div>
+            <small class="glass-disclaimer">Grafik dekoratif. Nilai dan jumlah di atas mengikuti data pesanan Firestore, bukan proyeksi pendapatan.</small>
+          </section>
+        </div>
+
+        <section class="glass-panel glass-modules-panel">
+          <div class="glass-panel-head"><div><span class="kicker">CONTROL CENTER</span><h2>Modul operasional</h2><p>Menu yang tersedia di workspace admin Kenseonn.</p></div><span class="glass-panel-mark">⌘</span></div>
+          <div class="capability-grid" id="capabilityGrid"></div>
+        </section>
       </div>
 
       <div id="sitePane" class="admin-pane hidden">
